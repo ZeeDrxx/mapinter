@@ -2,17 +2,21 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { formatEventDates, listMyEvents } from "@/lib/events";
-import { StatusBadge } from "@/components/status-badge";
+import { PublishMark } from "@/components/ui/status";
 
 export const metadata: Metadata = { title: "Mes events" };
 
 export default function DashboardPage() {
   return (
-    <div className="page flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Mes events</h1>
-        <Link href="/dashboard/events/new" className="btn-primary">
-          + Nouvel event
+    <div className="page flex flex-col gap-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="label">Organisateur</p>
+          <h1 className="h1 mt-2">Mes events</h1>
+        </div>
+        <Link href="/dashboard/events/new" className="btn btn-primary">
+          <span aria-hidden className="text-[18px] leading-none font-medium">+</span>
+          Nouvel event
         </Link>
       </div>
       <Suspense fallback={<EventListSkeleton />}>
@@ -27,12 +31,13 @@ async function EventList() {
 
   if (events.length === 0) {
     return (
-      <div className="card flex flex-col items-center gap-3 py-12 text-center">
-        <p className="font-medium">Aucun event pour l&apos;instant</p>
-        <p className="text-sm text-zinc-500">
-          Commencez par délimiter le lieu de votre premier event sur la carte.
+      <div className="well flex flex-col items-start gap-3 p-8">
+        <span className="signal-dot" aria-hidden />
+        <p className="h2">Aucun event pour l&apos;instant</p>
+        <p className="body max-w-[44ch]">
+          Commencez par délimiter le lieu de votre premier event : salle, parc des expositions, campus…
         </p>
-        <Link href="/dashboard/events/new" className="btn-primary mt-2">
+        <Link href="/dashboard/events/new" className="btn btn-primary mt-2">
           Créer un event
         </Link>
       </div>
@@ -40,30 +45,43 @@ async function EventList() {
   }
 
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {events.map((e) => (
-        <li key={e.id}>
-          <Link href={`/dashboard/events/${e.id}`} className="card block transition-colors hover:border-blue-400">
-            <div className="flex items-start justify-between gap-2">
-              <h2 className="font-semibold">{e.name}</h2>
-              <StatusBadge published={e.is_published} />
-            </div>
-            <p className="mt-1 font-mono text-xs text-zinc-500">/{e.slug}</p>
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-              {formatEventDates(e.starts_at, e.ends_at)}
-            </p>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 border-b border-ink pb-2 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_120px]">
+        <span className="label">Event</span>
+        <span className="label hidden md:block">Dates</span>
+        <span className="label text-right">État</span>
+      </div>
+      <ul>
+        {events.map((e) => (
+          <li key={e.id} className="border-b border-hair">
+            <Link
+              href={`/dashboard/events/${e.id}`}
+              className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-4 transition-colors hover:bg-paper-2 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_120px] md:px-2 md:-mx-2"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-[15px] font-semibold group-hover:underline group-hover:underline-offset-4">
+                  {e.name}
+                </span>
+                <span className="mt-0.5 block truncate font-mono text-[12px] text-t3">/e/{e.slug}</span>
+                <span className="num mt-1 block text-[13px] text-t3 md:hidden">{formatEventDates(e.starts_at, e.ends_at)}</span>
+              </span>
+              <span className="num hidden text-[13.5px] text-t2 md:block">{formatEventDates(e.starts_at, e.ends_at)}</span>
+              <span className="text-right">
+                <PublishMark published={e.is_published} />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
 function EventListSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="flex flex-col gap-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="card h-28 animate-pulse" />
+        <div key={i} className="skeleton h-16" />
       ))}
     </div>
   );

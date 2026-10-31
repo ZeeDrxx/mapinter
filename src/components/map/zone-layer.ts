@@ -1,9 +1,9 @@
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import { bboxToPolygon, type BBox } from "@/lib/geo";
+import { mapPalette } from "@/lib/theme";
 
 const SOURCE_ID = "event-zone";
-export const ZONE_COLOR = "#2563eb";
 
 function toCollection(bbox: BBox | null): FeatureCollection {
   return { type: "FeatureCollection", features: bbox ? [bboxToPolygon(bbox)] : [] };
@@ -16,18 +16,19 @@ export function setZone(map: MapLibreMap, bbox: BBox | null) {
     source.setData(toCollection(bbox));
     return;
   }
+  const c = mapPalette();
   map.addSource(SOURCE_ID, { type: "geojson", data: toCollection(bbox) });
   map.addLayer({
     id: `${SOURCE_ID}-fill`,
     type: "fill",
     source: SOURCE_ID,
-    paint: { "fill-color": ZONE_COLOR, "fill-opacity": 0.12 },
+    paint: { "fill-color": c.ink, "fill-opacity": 0.04 },
   });
   map.addLayer({
     id: `${SOURCE_ID}-line`,
     type: "line",
     source: SOURCE_ID,
-    paint: { "line-color": ZONE_COLOR, "line-width": 2.5, "line-dasharray": [2, 1] },
+    paint: { "line-color": c.ink, "line-width": 1.5, "line-dasharray": [3, 2], "line-opacity": 0.7 },
   });
 }
 

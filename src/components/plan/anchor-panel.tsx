@@ -8,6 +8,7 @@ import { ANCHOR_COLUMNS, type Anchor } from "@/lib/anchor";
 import type { LngLat } from "@/lib/geo";
 import { useAutosave } from "./use-autosave";
 import { useDragMarker } from "./use-drag-marker";
+import { ErrorText, Hint, Section, Selection } from "./panel-ui";
 
 type Patch = Partial<Omit<Anchor, "id">>;
 
@@ -102,46 +103,48 @@ export function AnchorPanel({
     map,
     selected,
     (id, [lng, lat]) => update(id, { lng, lat }, { immediate: true }),
-    "size-10 cursor-grab rounded-full border-[3px] border-rose-600 bg-rose-600/10",
+    "size-10 cursor-grab rounded-full border-2 border-dashed border-signal",
   );
 
   // --- Rendu ------------------------------------------------------------------
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-        Chaque QR code imprimé indique au visiteur <strong>« Vous êtes ici »</strong>, même en intérieur où le GPS
-        est imprécis. Placez-en aux entrées, aux croisements d&apos;allées et sur les piliers.
-      </div>
+    <div className="flex flex-col gap-7">
+      <Hint>
+        Chaque affiche indique au visiteur <strong className="font-semibold text-t1">« Vous êtes ici »</strong>, même en
+        intérieur où le GPS est imprécis. Placez-en aux entrées, aux croisements d&apos;allées et sur les piliers.
+      </Hint>
 
-      <div>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setAdding(false)} className={adding ? "btn-secondary" : "btn-primary"}>
+      <Section title="Mode">
+        <div className="segmented" role="radiogroup" aria-label="Mode">
+          <button type="button" role="radio" aria-checked={!adding} onClick={() => setAdding(false)}>
             Sélection
           </button>
           <button
             type="button"
+            role="radio"
+            aria-checked={adding}
+           
             onClick={() => {
               setAdding(true);
               setSelectedId(null);
             }}
-            className={adding ? "btn-primary" : "btn-secondary"}
           >
             + Placer un QR
           </button>
         </div>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="fine">
           {adding
             ? "Cliquez à l'endroit exact où l'affiche sera collée."
             : "Cliquez sur un point pour le renommer, glissez-le pour le déplacer."}
         </p>
-      </div>
+      </Section>
 
       {selected && (
-        <div className="flex flex-col gap-3 rounded-lg border border-rose-200 bg-rose-50/50 p-3 dark:border-rose-900 dark:bg-rose-950/20">
+        <Selection title="QR code sélectionné">
           <div>
-            <label htmlFor="anchor-label" className="label">
-              Emplacement (imprimé sur l&apos;affiche)
+            <label htmlFor="anchor-label" className="field-label">
+              Emplacement · imprimé sur l&apos;affiche
             </label>
             <input
               id="anchor-label"
@@ -150,24 +153,23 @@ export function AnchorPanel({
               onBlur={(e) => {
                 if (!e.target.value.trim()) update(selected.id, { label: "Point" }, { immediate: true });
               }}
-              placeholder="ex : Entrée Hall 1, Pilier C4"
+              placeholder="Entrée Hall 1, Pilier C4…"
               className="input"
             />
           </div>
-          <button type="button" onClick={() => remove(selected.id)} className="btn-ghost justify-start px-0 text-red-600">
+          <button type="button" onClick={() => remove(selected.id)} className="btn btn-ghost btn-sm -ml-3 self-start">
             Supprimer ce QR code
           </button>
-        </div>
+        </Selection>
       )}
 
-      <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-        <div className="flex items-center justify-between">
-          <p className="label mb-0">QR codes ({anchors.length})</p>
-          <span className="text-xs text-zinc-500">{pending > 0 ? "Enregistrement…" : error ? "" : "Enregistrés automatiquement"}</span>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <ul className="flex flex-col">
-          {anchors.map((a) => (
+      <Section
+        title={`QR codes · ${anchors.length}`}
+        aside={pending > 0 ? "Enregistrement…" : error ? undefined : "Enregistrés automatiquement"}
+      >
+        {error && <ErrorText>{error}</ErrorText>}
+        <ul className="-mx-2 flex flex-col">
+          {anchors.map((a, i) => (
             <li key={a.id}>
               <button
                 type="button"
@@ -175,26 +177,24 @@ export function AnchorPanel({
                   setSelectedId(a.id);
                   map.easeTo({ center: [a.lng, a.lat], zoom: Math.max(map.getZoom(), 18) });
                 }}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-                  a.id === selectedId ? "bg-rose-50 dark:bg-rose-950/40" : ""
+                aria-current={a.id === selectedId}
+                className={`flex w-full items-center gap-2.5 rounded-sign px-2 py-1.5 text-left text-[13.5px] transition-colors hover:bg-paper-2 ${
+                  a.id === selectedId ? "bg-paper-2" : ""
                 }`}
               >
-                <span className="size-2.5 shrink-0 rounded-full bg-rose-600" />
-                <span className="flex-1 truncate">{a.label}</span>
+                <span className="num grid size-5 shrink-0 place-items-center rounded-full bg-signal font-mono text-[10px] font-semibold text-on-signal">
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{a.label}</span>
               </button>
             </li>
           ))}
         </ul>
-        {anchors.length === 0 && <p className="text-sm text-zinc-500">Aucun QR code placé.</p>}
-        <a
-          href={`/dashboard/events/${eventId}/qr`}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-secondary mt-2"
-        >
+        {anchors.length === 0 && <p className="fine">Aucun QR code placé.</p>}
+        <a href={`/dashboard/events/${eventId}/qr`} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm self-start">
           Imprimer les affiches ↗
         </a>
-      </div>
+      </Section>
     </div>
   );
 }

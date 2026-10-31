@@ -17,6 +17,7 @@ import {
   type ImageTransform,
 } from "@/lib/plan";
 import type { EditorImage } from "./plan-editor";
+import { ErrorText, Hint, Range, Section } from "./panel-ui";
 
 const BUCKET = "layers";
 const DEFAULT_OPACITY = 0.75;
@@ -36,8 +37,8 @@ function handleElement(kind: "corner" | "center"): HTMLDivElement {
   const el = document.createElement("div");
   el.className =
     kind === "corner"
-      ? "size-4 cursor-grab rounded-sm border-2 border-blue-600 bg-white shadow"
-      : "grid size-7 cursor-move place-items-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg";
+      ? "size-4 cursor-grab rounded-[2px] border-2 border-signal bg-sheet shadow-sheet"
+      : "grid size-8 cursor-move place-items-center rounded-sign border-2 border-sheet bg-signal text-on-signal shadow-lift";
   if (kind === "center") el.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>';
   return el;
 }
@@ -240,30 +241,36 @@ export function ImagePanel({
 
   if (!image || !transform) {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Vous avez déjà le plan de votre lieu ? Importez-le, puis calez-le sur la carte.
-        </p>
-        <button
-          type="button"
-          onClick={() => fileInput.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
-          }}
-          disabled={busy}
-          className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 px-4 py-10 text-center hover:border-blue-400 hover:bg-blue-50/50 dark:border-zinc-700 dark:hover:bg-blue-950/20"
-        >
-          <span className="font-medium">{busy ? "Import en cours…" : "Choisir une image"}</span>
-          <span className="text-xs text-zinc-500">ou glissez-la ici · PNG, JPG, WebP</span>
-        </button>
-        {filePicker}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <p className="text-sm text-zinc-500">
-          Pas de plan ? Passez à l&apos;onglet <strong>Dessin</strong> pour le créer sur le fond de carte.
-        </p>
+      <div className="flex flex-col gap-6">
+        <Section title="Plan existant">
+          <p className="body text-[14px]">Vous avez déjà le plan de votre lieu ? Importez-le, puis calez-le sur la carte.</p>
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files[0];
+              if (file) handleFile(file);
+            }}
+            disabled={busy}
+            className="group flex flex-col items-center gap-3 rounded-sign bg-paper-2 px-4 py-10 text-center transition-colors hover:bg-paper-3"
+          >
+            <span className="grid size-11 place-items-center rounded-sign bg-ink text-on-ink transition-transform duration-300 ease-sign group-hover:-translate-y-0.5">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M10 13V3M6 7l4-4 4 4M3.5 13v3.5h13V13" />
+              </svg>
+            </span>
+            <span className="text-[14px] font-semibold">{busy ? "Import en cours…" : "Choisir une image"}</span>
+            <span className="fine">ou glissez-la ici · PNG, JPG, WebP</span>
+          </button>
+          {filePicker}
+          {error && <ErrorText>{error}</ErrorText>}
+        </Section>
+        <Hint>
+          Pas de plan ? L&apos;onglet <strong className="font-semibold text-t1">Dessin</strong> permet de le créer sur le
+          fond de carte : halls, allées, grilles de stands.
+        </Hint>
       </div>
     );
   }
@@ -271,117 +278,105 @@ export function ImagePanel({
   const heightMeters = mode === "rigid" ? transform.width * aspect : null;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+    <div className="flex flex-col gap-7">
+      <Hint>
         {mode === "rigid" ? (
           <>
-            Glissez la <strong>poignée centrale</strong> pour déplacer le plan et un <strong>coin</strong> pour
-            l&apos;agrandir et le tourner. Baissez l&apos;opacité pour l&apos;aligner sur la carte.
+            Glissez la <strong className="font-semibold text-t1">poignée centrale</strong> pour déplacer le plan, un{" "}
+            <strong className="font-semibold text-t1">coin</strong> pour l&apos;agrandir et le tourner. Baissez
+            l&apos;opacité pour l&apos;aligner sur la carte.
           </>
         ) : (
           <>
-            Glissez chaque <strong>coin</strong> sur sa position réelle. Idéal pour un plan pris en photo ou
-            légèrement déformé.
+            Glissez chaque <strong className="font-semibold text-t1">coin</strong> sur sa position réelle. Idéal pour un
+            plan pris en photo ou légèrement déformé.
           </>
         )}
-      </div>
+      </Hint>
 
-      <div>
-        <p className="label">Mode de calage</p>
-        <div className="grid grid-cols-2 gap-2">
+      <Section title="Calage">
+        <div className="segmented" role="radiogroup" aria-label="Mode de calage">
           {(
             [
               ["rigid", "Ajustement"],
               ["free", "Coins libres"],
             ] as const
           ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => switchMode(value)}
-              className={mode === value ? "btn-primary" : "btn-secondary"}
-            >
+            <button key={value} type="button" role="radio" aria-checked={mode === value} onClick={() => switchMode(value)}>
               {label}
             </button>
           ))}
         </div>
-      </div>
-
-      <div>
-        <label htmlFor="opacity" className="label">
-          Opacité · {Math.round(image.opacity * 100)} %
-        </label>
-        <input
+        <Range
           id="opacity"
-          type="range"
+          label="Opacité"
+          display={`${Math.round(image.opacity * 100)} %`}
+          value={image.opacity}
           min={0.1}
           max={1}
           step={0.05}
-          value={image.opacity}
-          onChange={(e) => onChange({ ...image, opacity: Number(e.target.value) })}
-          className="w-full accent-blue-600"
+          onChange={(opacity) => onChange({ ...image, opacity })}
         />
-      </div>
-
-      {mode === "rigid" && (
-        <>
-          <div>
-            <label htmlFor="rotation" className="label">
-              Rotation · {transform.rotation.toFixed(1)}°
-            </label>
-            <input
+        {mode === "rigid" && (
+          <>
+            <Range
               id="rotation"
-              type="range"
+              label="Rotation"
+              display={`${transform.rotation.toFixed(1)}°`}
+              value={transform.rotation}
               min={-180}
               max={180}
               step={0.5}
-              value={transform.rotation}
-              onChange={(e) => setTransform({ rotation: normalizeAngle(Number(e.target.value)) })}
-              className="w-full accent-blue-600"
+              onChange={(r) => setTransform({ rotation: normalizeAngle(r) })}
             />
-          </div>
-          <div>
-            <label htmlFor="width" className="label">
-              Largeur réelle (m)
-            </label>
-            <input
-              id="width"
-              type="number"
-              min={1}
-              step={1}
-              value={Math.round(transform.width)}
-              onChange={(e) => {
-                const width = Number(e.target.value);
-                if (width >= 1) setTransform({ width });
-              }}
-              className="input"
-            />
-            {heightMeters !== null && (
-              <p className="mt-1 text-xs text-zinc-500">
-                Soit {formatMeters(transform.width)} × {formatMeters(heightMeters)}
-              </p>
-            )}
-          </div>
-        </>
-      )}
+            <div>
+              <label htmlFor="width" className="field-label">
+                Largeur réelle
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="width"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={Math.round(transform.width)}
+                  onChange={(e) => {
+                    const width = Number(e.target.value);
+                    if (width >= 1) setTransform({ width });
+                  }}
+                  className="input num w-28 font-mono"
+                />
+                <span className="text-[13px] text-t3">mètres</span>
+              </div>
+              {heightMeters !== null && (
+                <p className="num fine mt-1.5 font-mono">
+                  {formatMeters(transform.width)} × {formatMeters(heightMeters)}
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </Section>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setCorners(transformToCorners(fitTransform(bbox, aspect), aspect))}
-          className="btn-secondary"
-        >
-          Recentrer sur la zone
-        </button>
-        <button type="button" onClick={() => fileInput.current?.click()} disabled={busy} className="btn-secondary">
-          {busy ? "Import…" : "Remplacer l'image"}
-        </button>
-        <button type="button" onClick={removeImage} disabled={busy} className="btn-ghost text-red-600">
-          Supprimer
-        </button>
-      </div>
-      {filePicker}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Section title="Image">
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setCorners(transformToCorners(fitTransform(bbox, aspect), aspect))}
+            className="btn btn-secondary btn-sm"
+          >
+            Recentrer sur la zone
+          </button>
+          <button type="button" onClick={() => fileInput.current?.click()} disabled={busy} className="btn btn-secondary btn-sm">
+            {busy ? "Import…" : "Remplacer"}
+          </button>
+          <button type="button" onClick={removeImage} disabled={busy} className="btn btn-ghost btn-sm">
+            Supprimer
+          </button>
+        </div>
+        {filePicker}
+        {error && <ErrorText>{error}</ErrorText>}
+      </Section>
     </div>
   );
 }

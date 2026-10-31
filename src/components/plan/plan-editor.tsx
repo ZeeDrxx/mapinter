@@ -178,32 +178,32 @@ export function PlanEditor({
     }
   }
 
+  // Hauteur figée sur grand écran : la liste défile dans la barre latérale au lieu d'étirer la page (et la carte)
   return (
-    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-3.5rem)] lg:flex-row">
-      <aside className="flex w-full shrink-0 flex-col border-zinc-200 bg-white lg:w-[360px] lg:border-r dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="border-b border-zinc-200 p-4 dark:border-zinc-800">
-          <Link href={`/dashboard/events/${event.id}`} className="text-sm text-zinc-500 hover:underline">
-            ← {event.name}
-          </Link>
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <h1 className="text-lg font-bold">Carte de l&apos;event</h1>
-            <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-3.5rem-1px)] lg:flex-none lg:flex-row lg:overflow-hidden">
+      <aside className="flex w-full shrink-0 flex-col bg-paper lg:min-h-0 lg:w-[380px] lg:border-r lg:border-hair">
+        <div className="border-b border-hair px-5 pt-4 pb-4">
+          <div className="flex items-center justify-between gap-2">
+            <Link href={`/dashboard/events/${event.id}`} className="btn btn-ghost btn-sm -ml-3 min-w-0">
+              <span className="truncate">← {event.name}</span>
+            </Link>
+            <a href={`/e/${event.slug}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm -mr-3 shrink-0">
               Vue visiteur ↗
             </a>
           </div>
-          <div className="mt-3 grid grid-cols-4 rounded-lg bg-zinc-100 p-1 text-sm dark:bg-zinc-800">
+          <h1 className="mt-2 text-[22px] font-extrabold tracking-[-0.03em]">Carte de l&apos;event</h1>
+          <div className="segmented mt-4" role="tablist">
             {TABS.map(([value, label]) => (
               <button
                 key={value}
                 type="button"
+                role="tab"
+                aria-selected={tab === value}
                 onClick={() => {
                   setTab(value);
                   setSelectedId(null);
                   setSelectedPoiId(null);
                 }}
-                className={`rounded-md py-1.5 font-medium ${
-                  tab === value ? "bg-white shadow-sm dark:bg-zinc-900" : "text-zinc-500"
-                }`}
               >
                 {label}
               </button>
@@ -211,7 +211,7 @@ export function PlanEditor({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           {map &&
             (tab === "image" ? (
               <ImagePanel
@@ -255,35 +255,35 @@ export function PlanEditor({
             ))}
         </div>
 
-        <div className="flex items-center gap-3 border-t border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="flex-1 text-sm text-zinc-500">
-            <span className="block text-xs text-zinc-400">Plan (image + dessin)</span>
-            {saveState === "saving"
-              ? "Enregistrement…"
-              : saveState === "error"
-                ? <span className="text-red-600">Échec de l&apos;enregistrement</span>
-                : dirty
-                  ? "Modifications non enregistrées"
-                  : saveState === "saved"
-                    ? "Enregistré"
-                    : "À jour"}
-          </p>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty || saveState === "saving"}
-            className="btn-primary"
-          >
+        <div className="flex items-center gap-3 border-t border-hair bg-paper px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <p className="label text-[10px]">Plan · image et dessin</p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[13px] font-medium">
+              {saveState === "error" ? (
+                <span className="text-busy">Échec de l&apos;enregistrement</span>
+              ) : saveState === "saving" ? (
+                <span className="text-t3">Enregistrement…</span>
+              ) : dirty ? (
+                <>
+                  <span className="size-1.5 rounded-full bg-busy" aria-hidden />
+                  <span className="text-t2">Modifications non enregistrées</span>
+                </>
+              ) : (
+                <span className="text-t3">{saveState === "saved" ? "Enregistré" : "À jour"}</span>
+              )}
+            </p>
+          </div>
+          <button type="button" onClick={save} disabled={!dirty || saveState === "saving"} className="btn btn-primary">
             Enregistrer
           </button>
         </div>
       </aside>
 
-      <div className="relative min-h-[60dvh] flex-1">
-        <div ref={containerRef} className="absolute inset-0" />
+      <div className="relative min-h-[60dvh] flex-1 bg-paper-2">
+        <div ref={containerRef} className="map-fill absolute inset-0" />
         {!map && (
-          <div className="absolute inset-0 grid place-items-center bg-zinc-100 text-sm text-zinc-500 dark:bg-zinc-900">
-            Chargement de la carte…
+          <div className="absolute inset-0 grid place-items-center">
+            <p className="label">Chargement de la carte…</p>
           </div>
         )}
       </div>

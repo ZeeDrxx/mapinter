@@ -42,3 +42,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Copié depuis node_modules avant dev/build
+/public/vendor

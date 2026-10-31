@@ -13,17 +13,10 @@ export function AuthForm() {
   const pending = isSignIn ? signingIn : signingUp;
 
   return (
-    <div className="card flex flex-col gap-5">
-      <div className="grid grid-cols-2 rounded-lg bg-zinc-100 p-1 text-sm dark:bg-zinc-800">
+    <div className="sheet rise flex flex-col gap-6 p-6 [animation-delay:60ms]">
+      <div className="segmented" role="tablist">
         {(["signin", "signup"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`rounded-md py-1.5 font-medium ${
-              mode === m ? "bg-white shadow-sm dark:bg-zinc-900" : "text-zinc-500"
-            }`}
-          >
+          <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
             {m === "signin" ? "Connexion" : "Inscription"}
           </button>
         ))}
@@ -31,13 +24,13 @@ export function AuthForm() {
 
       <form action={isSignIn ? signInAction : signUpAction} className="flex flex-col gap-4">
         <div>
-          <label htmlFor="email" className="label">
+          <label htmlFor="email" className="field-label">
             E-mail
           </label>
           <input id="email" name="email" type="email" required autoComplete="email" className="input" />
         </div>
         <div>
-          <label htmlFor="password" className="label">
+          <label htmlFor="password" className="field-label">
             Mot de passe
           </label>
           <input
@@ -49,12 +42,21 @@ export function AuthForm() {
             autoComplete={isSignIn ? "current-password" : "new-password"}
             className="input"
           />
+          {!isSignIn && <p className="fine mt-1.5">8 caractères minimum.</p>}
         </div>
 
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.message && <p className="text-sm text-green-700">{state.message}</p>}
+        {state?.error && (
+          <p role="alert" className="text-[13.5px] font-semibold text-busy">
+            {state.error}
+          </p>
+        )}
+        {state?.message && (
+          <p role="status" className="well p-3 text-[13.5px] text-t2">
+            {state.message}
+          </p>
+        )}
 
-        <button type="submit" disabled={pending} className="btn-primary">
+        <button type="submit" disabled={pending} className="btn btn-primary mt-1 w-full">
           {pending ? "Patientez…" : isSignIn ? "Se connecter" : "Créer mon compte"}
         </button>
       </form>

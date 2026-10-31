@@ -21,24 +21,37 @@ import {
   type PlanFeature,
   type PlanKind,
 } from "@/lib/plan";
+import { mapPalette } from "@/lib/theme";
+import { ErrorText, Hint, Section, Selection } from "./panel-ui";
 
 type Tool = "select" | "rect" | "polygon" | "path" | "grid";
 
-const TOOLS: { id: Tool; label: string; help: string }[] = [
-  { id: "select", label: "Sélection", help: "Cliquez sur un élément pour le modifier. Suppr pour l'effacer." },
-  { id: "rect", label: "Rectangle", help: "Cliquez 2 points pour un côté, puis un 3e pour la largeur." },
+const TOOLS: { id: Tool; label: string; short: string; help: string }[] = [
+  { id: "select", label: "Sélection", short: "Choisir", help: "Cliquez sur un élément pour le modifier. Suppr pour l'effacer." },
+  { id: "rect", label: "Rectangle", short: "Rect.", help: "Cliquez 2 points pour un côté, puis un 3e pour la largeur." },
   {
     id: "polygon",
     label: "Polygone",
+    short: "Forme",
     help: "Cliquez chaque sommet. Double-clic, Entrée ou clic sur le 1er point pour terminer.",
   },
-  { id: "path", label: "Chemin", help: "Cliquez chaque point du chemin. Double-clic ou Entrée pour terminer." },
+  { id: "path", label: "Chemin", short: "Allée", help: "Cliquez chaque point de l'allée. Double-clic ou Entrée pour terminer." },
   {
     id: "grid",
     label: "Grille de stands",
-    help: "Cliquez 2 points le long de la rangée, puis un 3e pour la profondeur.",
+    short: "Stands",
+    help: "Cliquez 2 points le long de la rangée, puis un 3e pour la profondeur. Les stands sont numérotés tout seuls.",
   },
 ];
+
+// Icônes d'outil, grille de 20
+const TOOL_ICONS: Record<Tool, string> = {
+  select: "M5 3.5 15.5 9l-4.6 1.4L8.8 15Z",
+  rect: "M3.5 5.5h13v9h-13Z",
+  polygon: "M10 3 16.5 7.8 14 16H6L3.5 7.8Z",
+  path: "M3 15.5 7.5 9l4 3.5L17 4.5",
+  grid: "M3 4.5h6v5H3ZM11 4.5h6v5h-6ZM3 11.5h6v5H3ZM11 11.5h6v5h-6Z",
+};
 
 type GridOptions = { rows: number; cols: number; prefix: string; start: number };
 
@@ -55,27 +68,29 @@ function setDraft(map: MapLibreMap, features: Feature[]) {
     source.setData(data);
     return;
   }
+  // Le tracé en cours est une sélection : il prend le signal
+  const c = mapPalette();
   map.addSource(DRAFT_SOURCE, { type: "geojson", data });
   map.addLayer({
     id: `${DRAFT_SOURCE}-fill`,
     type: "fill",
     source: DRAFT_SOURCE,
     filter: ["==", ["geometry-type"], "Polygon"],
-    paint: { "fill-color": "#2563eb", "fill-opacity": 0.15 },
+    paint: { "fill-color": c.signal, "fill-opacity": 0.1 },
   });
   map.addLayer({
     id: `${DRAFT_SOURCE}-line`,
     type: "line",
     source: DRAFT_SOURCE,
     filter: ["!=", ["geometry-type"], "Point"],
-    paint: { "line-color": "#2563eb", "line-width": 2, "line-dasharray": [2, 1] },
+    paint: { "line-color": c.signal, "line-width": 1.8, "line-dasharray": [2, 1.5] },
   });
   map.addLayer({
     id: `${DRAFT_SOURCE}-points`,
     type: "circle",
     source: DRAFT_SOURCE,
     filter: ["==", ["geometry-type"], "Point"],
-    paint: { "circle-radius": 4, "circle-color": "#ffffff", "circle-stroke-color": "#2563eb", "circle-stroke-width": 2 },
+    paint: { "circle-radius": 4, "circle-color": c.sheet, "circle-stroke-color": c.signal, "circle-stroke-width": 2 },
   });
 }
 
@@ -332,132 +347,144 @@ export function DrawPanel({
   }, {});
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <p className="label">Outil</p>
-        <div className="grid grid-cols-2 gap-2">
+    <div className="flex flex-col gap-7">
+      <Section title="Outil">
+        <div className="grid grid-cols-5 gap-1">
           {TOOLS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => chooseTool(t.id)}
-              className={`${tool === t.id ? "btn-primary" : "btn-secondary"} ${t.id === "grid" ? "col-span-2" : ""}`}
+              aria-pressed={tool === t.id}
+              title={t.label}
+              className={`flex flex-col items-center gap-1.5 rounded-sign px-1 pt-2.5 pb-2 text-[11px] leading-tight font-semibold transition-colors ${
+                tool === t.id ? "bg-ink text-on-ink" : "bg-paper-2 text-t2 hover:bg-paper-3"
+              }`}
             >
-              {t.label}
+              <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d={TOOL_ICONS[t.id]} />
+              </svg>
+              {t.short}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-sm text-zinc-500">{TOOLS.find((t) => t.id === tool)!.help}</p>
-      </div>
+        <Hint>{TOOLS.find((t) => t.id === tool)!.help}</Hint>
 
-      {(tool === "rect" || tool === "polygon") && (
-        <div>
-          <label htmlFor="area-kind" className="label">
-            Type d&apos;élément
-          </label>
-          <select
-            id="area-kind"
-            value={areaKind}
-            onChange={(e) => setAreaKind(e.target.value as AreaKind)}
-            className="input"
-          >
-            {AREA_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {PLAN_KINDS[k].label}
-              </option>
+        {(tool === "rect" || tool === "polygon") && (
+          <div>
+            <label htmlFor="area-kind" className="field-label">
+              Type d&apos;élément
+            </label>
+            <select id="area-kind" value={areaKind} onChange={(e) => setAreaKind(e.target.value as AreaKind)} className="input">
+              {AREA_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {PLAN_KINDS[k].label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {tool === "grid" && (
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                ["rows", "Rangées", 1, 20],
+                ["cols", "Stands par rangée", 1, 50],
+              ] as const
+            ).map(([key, label, min, max]) => (
+              <div key={key}>
+                <label htmlFor={`grid-${key}`} className="field-label">
+                  {label}
+                </label>
+                <input
+                  id={`grid-${key}`}
+                  type="number"
+                  min={min}
+                  max={max}
+                  value={grid[key]}
+                  onChange={(e) => {
+                    const v = Math.round(Number(e.target.value));
+                    if (v >= min && v <= max) setGrid({ ...grid, [key]: v });
+                  }}
+                  className="input num font-mono"
+                />
+              </div>
             ))}
-          </select>
-        </div>
-      )}
-
-      {tool === "grid" && (
-        <div className="grid grid-cols-2 gap-3">
-          {(
-            [
-              ["rows", "Rangées", 1, 20],
-              ["cols", "Stands par rangée", 1, 50],
-            ] as const
-          ).map(([key, label, min, max]) => (
-            <div key={key}>
-              <label htmlFor={`grid-${key}`} className="label">
-                {label}
+            <div>
+              <label htmlFor="grid-prefix" className="field-label">
+                Préfixe
               </label>
               <input
-                id={`grid-${key}`}
-                type="number"
-                min={min}
-                max={max}
-                value={grid[key]}
-                onChange={(e) => {
-                  const v = Math.round(Number(e.target.value));
-                  if (v >= min && v <= max) setGrid({ ...grid, [key]: v });
-                }}
-                className="input"
+                id="grid-prefix"
+                value={grid.prefix}
+                maxLength={4}
+                onChange={(e) => setGrid({ ...grid, prefix: e.target.value.toUpperCase() })}
+                className="input font-mono"
               />
             </div>
-          ))}
-          <div>
-            <label htmlFor="grid-prefix" className="label">
-              Préfixe
-            </label>
-            <input
-              id="grid-prefix"
-              value={grid.prefix}
-              maxLength={4}
-              onChange={(e) => setGrid({ ...grid, prefix: e.target.value.toUpperCase() })}
-              className="input"
-            />
+            <div>
+              <label htmlFor="grid-start" className="field-label">
+                Premier numéro
+              </label>
+              <input
+                id="grid-start"
+                type="number"
+                min={0}
+                value={grid.start}
+                onChange={(e) => setGrid({ ...grid, start: Math.max(0, Math.round(Number(e.target.value))) })}
+                className="input num font-mono"
+              />
+            </div>
+            <p className="col-span-2 flex items-center gap-1.5 text-[12.5px] text-t3">
+              <span className="plate text-[11px]">
+                {grid.prefix}
+                {grid.start}
+              </span>
+              à
+              <span className="plate text-[11px]">
+                {grid.prefix}
+                {grid.start + grid.rows * grid.cols - 1}
+              </span>
+              <span className="num">· {grid.rows * grid.cols} stands</span>
+            </p>
           </div>
-          <div>
-            <label htmlFor="grid-start" className="label">
-              Premier numéro
-            </label>
-            <input
-              id="grid-start"
-              type="number"
-              min={0}
-              value={grid.start}
-              onChange={(e) => setGrid({ ...grid, start: Math.max(0, Math.round(Number(e.target.value))) })}
-              className="input"
-            />
-          </div>
-          <p className="col-span-2 text-xs text-zinc-500">
-            Stands {grid.prefix}
-            {grid.start} à {grid.prefix}
-            {grid.start + grid.rows * grid.cols - 1}
-          </p>
-        </div>
-      )}
+        )}
+      </Section>
 
       {selected && <SelectedFeature feature={selected} onUpdate={updateSelected} onDelete={deleteSelected} />}
 
-      <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-        <p className="label">Partir d&apos;OpenStreetMap</p>
-        <button type="button" onClick={importOsm} disabled={osmState.status === "loading"} className="btn-secondary">
-          {osmState.status === "loading" ? "Import…" : "Importer les bâtiments de la zone"}
+      <Section title="Partir d'OpenStreetMap">
+        <p className="body text-[13.5px]">Récupère les contours des bâtiments de la zone, à compléter ensuite.</p>
+        <button type="button" onClick={importOsm} disabled={osmState.status === "loading"} className="btn btn-secondary btn-sm self-start">
+          {osmState.status === "loading" ? "Import…" : "Importer les bâtiments"}
         </button>
-        {osmState.status === "loading" && (
-          <p className="text-sm text-zinc-500">
-            Interrogation d&apos;OpenStreetMap… cela peut prendre jusqu&apos;à une minute.
-          </p>
-        )}
-        {osmState.message && (
-          <p className={`text-sm ${osmState.status === "error" ? "text-red-600" : "text-zinc-500"}`}>
-            {osmState.message}
-          </p>
-        )}
-      </div>
+        {osmState.status === "loading" && <p className="fine">Interrogation d&apos;OpenStreetMap… jusqu&apos;à une minute.</p>}
+        {osmState.message &&
+          (osmState.status === "error" ? <ErrorText>{osmState.message}</ErrorText> : <p className="fine">{osmState.message}</p>)}
+      </Section>
 
-      <div className="flex items-center justify-between border-t border-zinc-200 pt-4 text-sm dark:border-zinc-800">
-        <p className="text-zinc-500">
-          {plan.features.length === 0
-            ? "Aucun élément"
-            : (Object.keys(counts) as PlanKind[]).map((k) => `${counts[k]} ${PLAN_KINDS[k].label.toLowerCase()}`).join(" · ")}
-        </p>
-        <button type="button" onClick={onUndo} disabled={!canUndo} className="btn-ghost px-2 py-1" title="Ctrl+Z">
-          Annuler
-        </button>
-      </div>
+      <Section
+        title="Éléments"
+        aside={
+          <button type="button" onClick={onUndo} disabled={!canUndo} className="btn btn-ghost btn-sm -my-1 -mr-2 min-h-0 py-1" title="Ctrl+Z">
+            Annuler
+          </button>
+        }
+      >
+        {plan.features.length === 0 ? (
+          <p className="fine">Aucun élément pour l&apos;instant.</p>
+        ) : (
+          <ul className="num grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
+            {(Object.keys(counts) as PlanKind[]).map((k) => (
+              <li key={k} className="flex justify-between gap-2 border-b border-hair py-1">
+                <span className="text-t2">{PLAN_KINDS[k].label}</span>
+                <span className="font-mono font-semibold">{counts[k]}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
     </div>
   );
 }
@@ -479,22 +506,13 @@ function SelectedFeature({
       : formatMeters(lineLength(feature.geometry.coordinates as LngLat[]));
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Élément sélectionné</p>
-        <span className="text-xs text-zinc-500">{measure}</span>
-      </div>
+    <Selection title="Élément sélectionné" aside={measure}>
       {isArea && (
         <div>
-          <label htmlFor="sel-kind" className="label">
+          <label htmlFor="sel-kind" className="field-label">
             Type
           </label>
-          <select
-            id="sel-kind"
-            value={kind}
-            onChange={(e) => onUpdate({ kind: e.target.value as AreaKind })}
-            className="input"
-          >
+          <select id="sel-kind" value={kind} onChange={(e) => onUpdate({ kind: e.target.value as AreaKind })} className="input">
             {AREA_KINDS.map((k) => (
               <option key={k} value={k}>
                 {PLAN_KINDS[k].label}
@@ -504,20 +522,20 @@ function SelectedFeature({
         </div>
       )}
       <div>
-        <label htmlFor="sel-label" className="label">
-          Nom / numéro affiché
+        <label htmlFor="sel-label" className="field-label">
+          Nom ou numéro affiché
         </label>
         <input
           id="sel-label"
           value={label}
           onChange={(e) => onUpdate({ label: e.target.value })}
-          placeholder={isArea ? "ex : Hall 1, B12…" : "ex : Allée centrale"}
+          placeholder={isArea ? "Hall 1, B12…" : "Allée centrale"}
           className="input"
         />
       </div>
-      <button type="button" onClick={onDelete} className="btn-ghost justify-start px-0 text-red-600">
+      <button type="button" onClick={onDelete} className="btn btn-ghost btn-sm -ml-3 self-start">
         Supprimer l&apos;élément
       </button>
-    </div>
+    </Selection>
   );
 }

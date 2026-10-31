@@ -12,7 +12,7 @@ import { listAnnouncements } from "@/lib/announcements";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#2563eb",
+  viewportFit: "cover",
 };
 
 export async function generateMetadata({ params }: PageProps<"/e/[slug]">): Promise<Metadata> {
@@ -31,8 +31,8 @@ export default function VisitorPage({ params, searchParams }: PageProps<"/e/[slu
   return (
     <Suspense
       fallback={
-        <div className="grid h-dvh place-items-center bg-zinc-100 text-sm text-zinc-500 dark:bg-zinc-900">
-          Chargement de la carte…
+        <div className="grid h-dvh place-items-center bg-paper">
+          <p className="label">Chargement du plan…</p>
         </div>
       }
     >

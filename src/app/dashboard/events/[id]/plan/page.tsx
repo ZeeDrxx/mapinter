@@ -15,7 +15,9 @@ export default function PlanPage({ params, searchParams }: PageProps<"/dashboard
   return (
     <Suspense
       fallback={
-        <div className="grid flex-1 place-items-center text-sm text-zinc-500">Chargement de l&apos;éditeur…</div>
+        <div className="grid flex-1 place-items-center">
+          <p className="label">Chargement de l&apos;éditeur…</p>
+        </div>
       }
     >
       <PlanLoader params={params} searchParams={searchParams} />

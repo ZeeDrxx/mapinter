@@ -37,6 +37,27 @@ npm run dev
 - Supabase Studio : http://127.0.0.1:54323
 - E-mails de test (Mailpit) : http://127.0.0.1:54324
 
+## Design · « Signalétique »
+
+MapInter se lit comme un panneau d'orientation. Les principes sont écrits en tête de
+[src/app/globals.css](src/app/globals.css) ; les couleurs de la carte (MapLibre ne lit pas le CSS)
+sont dans [src/lib/theme.ts](src/lib/theme.ts), à garder synchronisées.
+
+- Un seul signal (vermillon) : position, sélection, direct. Rien d'autre.
+- Papier et encre, filets plutôt que boîtes, 3 px de rayon.
+- Catégories = pictogrammes ([src/lib/pictograms.ts](src/lib/pictograms.ts)), jamais une couleur.
+- Statuts : forme + mot ([src/components/ui/status.tsx](src/components/ui/status.tsx)).
+- Numéros sur plaques (`.plate`), police Overpass et Overpass Mono.
+
+## Démo
+
+```bash
+SUPABASE_URL=… SUPABASE_SECRET_KEY=… npm run seed:demo -- <email-du-compte>
+```
+
+Crée (ou recrée) « Salon Tech & Carrières 2026 » sur `/e/demo-salon-tech-2026` : 56 stands,
+scène, salles, services, 4 QR codes et 2 annonces. La clé secrète ne sort jamais de votre poste.
+
 ## Production
 
 - App : https://mapinter.vercel.app (Vercel, déployée automatiquement à chaque push sur `mvp`)

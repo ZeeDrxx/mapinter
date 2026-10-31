@@ -6,19 +6,12 @@ import type { FeatureCollection } from "geojson";
 import { useMapLibre } from "@/components/map/use-maplibre";
 import { PLAN_FILL, setPlanFeatures, setPlanImage, type PlanImage } from "@/components/map/plan-layers";
 import { poiAt, setPois } from "@/components/map/poi-layers";
-import {
-  POI_CATEGORIES,
-  POI_CATEGORY_IDS,
-  POI_STATUSES,
-  poiTitle,
-  searchPois,
-  type Poi,
-  type PoiCategory,
-} from "@/lib/poi";
 import { setGuide, setHere } from "@/components/map/anchor-layers";
+import { Pictogram } from "@/components/ui/pictogram";
+import { StatusMark } from "@/components/ui/status";
+import { POI_CATEGORIES, POI_CATEGORY_IDS, poiTitle, searchPois, type Poi, type PoiCategory } from "@/lib/poi";
 import { emptyPlan, fromLocal } from "@/lib/plan";
-import { useLiveEvent, type LiveData } from "./use-live-event";
-import { AnnouncementBanner } from "./announcement-banner";
+import { mapPalette } from "@/lib/theme";
 import type { Anchor } from "@/lib/anchor";
 import {
   bearingDegrees,
@@ -29,19 +22,21 @@ import {
   type BBox,
   type LngLat,
 } from "@/lib/geo";
+import { useLiveEvent, type LiveData } from "./use-live-event";
+import { AnnouncementBanner } from "./announcement-banner";
 
 const POI_PARAM = "lieu";
 /** Au-delà, la position GPS est signalée comme approximative. */
 const GOOD_ACCURACY_M = 30;
 /** En deçà, le GPS est préféré au dernier QR scanné (qui vieillit dès qu'on marche). */
 const PRECISE_GPS_M = 15;
-/** Hauteur réservée à la fiche du lieu, pour centrer la carte au-dessus. */
-const SHEET_PADDING = 240;
+/** Hauteur réservée à la fiche du lieu, pour centrer la carte au-dessus (mobile). */
+const SHEET_PADDING = 260;
 
 type Geo = { position: LngLat; accuracy: number };
 
 // ---------------------------------------------------------------------------
-// Position de l'utilisateur
+// Position GPS de l'utilisateur
 // ---------------------------------------------------------------------------
 
 const ME_SOURCE = "me";
@@ -72,20 +67,21 @@ function setMe(map: MapLibreMap, geo: Geo | null) {
     source.setData(data);
     return;
   }
+  const c = mapPalette();
   map.addSource(ME_SOURCE, { type: "geojson", data });
   map.addLayer({
     id: `${ME_SOURCE}-accuracy`,
     type: "fill",
     source: ME_SOURCE,
     filter: ["==", ["get", "kind"], "accuracy"],
-    paint: { "fill-color": "#2563eb", "fill-opacity": 0.12, "fill-outline-color": "#2563eb" },
+    paint: { "fill-color": c.signal, "fill-opacity": 0.1 },
   });
   map.addLayer({
     id: `${ME_SOURCE}-dot`,
     type: "circle",
     source: ME_SOURCE,
     filter: ["==", ["get", "kind"], "dot"],
-    paint: { "circle-radius": 7, "circle-color": "#2563eb", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 },
+    paint: { "circle-radius": 7, "circle-color": c.signal, "circle-stroke-color": c.paper, "circle-stroke-width": 3 },
   });
 }
 
@@ -148,6 +144,19 @@ export function VisitorMap({
   const [locating, setLocating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const watchId = useRef<number | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  /** Marges de cadrage : la carte se centre dans la partie que les panneaux ne couvrent pas. */
+  function overlayPadding(sheetOpen: boolean) {
+    const r = overlayRef.current?.getBoundingClientRect();
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      return { top: 48, bottom: 48, left: (r?.right ?? 416) + 40, right: 72 };
+    }
+    // Fiche ouverte : filtres et annonces sont masqués, seul l'en-tête reste
+    const top = sheetOpen ? headerRef.current?.getBoundingClientRect().bottom : r?.bottom;
+    return { top: (top ?? 160) + 20, bottom: sheetOpen ? SHEET_PADDING + 24 : 80, left: 24, right: 24 };
+  }
 
   const selected = pois.find((p) => p.id === selectedId) ?? null;
   const visible = useMemo(
@@ -181,11 +190,12 @@ export function VisitorMap({
     ]);
   }, [map, bbox]);
 
+  const selectedFeatureId = selected?.featureId ?? null;
   useEffect(() => {
     if (!map) return;
     setPlanImage(map, image);
-    setPlanFeatures(map, plan ?? emptyPlan());
-  }, [map, image, plan]);
+    setPlanFeatures(map, plan ?? emptyPlan(), selectedFeatureId);
+  }, [map, image, plan, selectedFeatureId]);
 
   useEffect(() => {
     if (map) setPois(map, visible, selectedId);
@@ -221,8 +231,11 @@ export function VisitorMap({
     if (poi) url.searchParams.set(POI_PARAM, poi.id);
     else url.searchParams.delete(POI_PARAM);
     window.history.replaceState(null, "", url);
-    if (!poi || !fly || !map) return;
-    const padding = { top: 140, bottom: SHEET_PADDING + 24, left: 40, right: 40 };
+    if (!map) return;
+    // La marge des panneaux vit sur la carte (persistante) : les mouvements n'en ajoutent pas,
+    // sinon fitBounds les cumule et dézoome.
+    map.setPadding(overlayPadding(poi !== null));
+    if (!poi || !fly) return;
     if (origin) {
       // Cadre le trajet entier : position du visiteur → lieu
       map.fitBounds(
@@ -230,28 +243,54 @@ export function VisitorMap({
           [Math.min(origin[0], poi.lng), Math.min(origin[1], poi.lat)],
           [Math.max(origin[0], poi.lng), Math.max(origin[1], poi.lat)],
         ],
-        { padding, maxZoom: 19 },
+        { padding: 40, maxZoom: 19 },
       );
     } else {
-      map.easeTo({ center: [poi.lng, poi.lat], zoom: Math.max(map.getZoom(), 18), padding: { ...padding, top: 0 } });
+      map.easeTo({ center: [poi.lng, poi.lat], zoom: Math.max(map.getZoom(), 18) });
     }
   }
 
   // Ouverture par un lien : sur le lieu partagé (?lieu=) ou sur le QR scanné (?ici=)
   const centerOnInitial = useEffectEvent(() => {
     if (!map) return;
+    map.setPadding(overlayPadding(selected !== null));
     if (selected) {
-      map.jumpTo({
-        center: [selected.lng, selected.lat],
-        zoom: 18,
-        padding: { top: 0, bottom: SHEET_PADDING, left: 0, right: 0 },
-      });
+      map.jumpTo({ center: [selected.lng, selected.lat], zoom: 18 });
     } else if (here) {
       map.jumpTo({ center: [here.lng, here.lat], zoom: 18 });
+    } else {
+      map.fitBounds(
+        [
+          [bbox[0], bbox[1]],
+          [bbox[2], bbox[3]],
+        ],
+        { padding: 24, animate: false },
+      );
     }
   });
   useEffect(() => {
     if (map) centerOnInitial();
+  }, [map]);
+
+  // Les panneaux changent de taille (annonce masquée, rotation de l'écran…) : la marge suit
+  const syncPadding = useEffectEvent(() => {
+    if (!map) return;
+    const next = overlayPadding(selectedId !== null);
+    const current = map.getPadding();
+    const same = (["top", "bottom", "left", "right"] as const).every((k) => Math.abs((current[k] ?? 0) - next[k]) < 2);
+    // Inchangée (cas d'une sélection, déjà posée par select) : ne pas couper l'animation en cours
+    if (!same) map.easeTo({ padding: next, duration: 250 });
+  });
+  useEffect(() => {
+    if (!map || !overlayRef.current) return;
+    let first = true;
+    const observer = new ResizeObserver(() => {
+      // Le premier appel est immédiat et la marge vient d'être posée par centerOnInitial
+      if (first) first = false;
+      else syncPadding();
+    });
+    observer.observe(overlayRef.current);
+    return () => observer.disconnect();
   }, [map]);
 
   const onClick = useEffectEvent((e: MapMouseEvent) => {
@@ -274,7 +313,13 @@ export function VisitorMap({
     select(null);
   });
   const onMove = useEffectEvent((e: MapMouseEvent) => {
-    if (map) map.getCanvas().style.cursor = poiAt(map, e.point) ? "pointer" : "";
+    if (!map) return;
+    const overStand =
+      map.getLayer(PLAN_FILL) &&
+      map
+        .queryRenderedFeatures(e.point, { layers: [PLAN_FILL] })
+        .some((f) => visible.some((p) => p.featureId === f.properties?.id));
+    map.getCanvas().style.cursor = poiAt(map, e.point) || overStand ? "pointer" : "";
   });
 
   useEffect(() => {
@@ -308,7 +353,7 @@ export function VisitorMap({
       return;
     }
     if (!window.isSecureContext || !("geolocation" in navigator)) {
-      setToast("La localisation n'est pas disponible sur cette connexion (https requis).");
+      setToast("La localisation demande une connexion sécurisée (https).");
       return;
     }
     setLocating(true);
@@ -325,7 +370,7 @@ export function VisitorMap({
         } else {
           map?.easeTo({ center: next.position, zoom: Math.max(map.getZoom(), 18) });
           if (next.accuracy > GOOD_ACCURACY_M) {
-            setToast(`Position approximative (± ${Math.round(next.accuracy)} m), fréquent en intérieur.`);
+            setToast(`Position approximative (± ${Math.round(next.accuracy)} m), fréquent en intérieur. Scannez un QR code « Vous êtes ici ».`);
           }
         }
       },
@@ -356,7 +401,7 @@ export function VisitorMap({
 
   async function share(poi: Poi) {
     const url = window.location.href;
-    const title = `${poiTitle(poi)} · ${event.name}`;
+    const title = `${poiTitle(poi)} · ${event.name}`;
     try {
       if (navigator.share) await navigator.share({ title, url });
       else {
@@ -369,54 +414,67 @@ export function VisitorMap({
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-      <div ref={containerRef} className="absolute inset-0" />
+    <div className="fixed inset-0 overflow-hidden bg-paper">
+      <div ref={containerRef} className="map-fill absolute inset-0" />
       {!map && (
-        <div className="absolute inset-0 grid place-items-center text-sm text-zinc-500">Chargement de la carte…</div>
+        <div className="absolute inset-0 grid place-items-center">
+          <p className="label">Chargement du plan…</p>
+        </div>
       )}
 
-      {/* En-tête : recherche + filtres */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2 p-3">
+      {/* Colonne : panneau d'en-tête, filtres, annonces */}
+      <div ref={overlayRef} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2 p-3 md:right-auto md:w-[400px] md:p-4">
         {!event.isPublished && (
-          <p className="pointer-events-auto mx-auto rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white shadow">
-            Aperçu organisateur · non publié
+          <p className="pointer-events-auto self-start rounded-sign bg-ink px-2.5 py-1 text-[11px] font-bold tracking-[0.14em] text-on-ink uppercase">
+            Aperçu · non publié
           </p>
         )}
-        <div className="pointer-events-auto relative mx-auto w-full max-w-md">
-          <div className="rounded-2xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10">
-            <div className="flex items-center gap-2 px-4 pt-2.5">
-              <p className="flex-1 truncate text-xs font-semibold text-blue-600">{event.name}</p>
-              <span
-                className={`flex items-center gap-1 text-[11px] font-medium ${live ? "text-green-600" : "text-zinc-400"}`}
-                title={live ? "Mises à jour en direct" : "Connexion au direct…"}
-              >
-                <span className={`size-1.5 rounded-full ${live ? "animate-pulse bg-green-500" : "bg-zinc-300"}`} />
-                {live ? "En direct" : "Hors ligne"}
+
+        <div ref={headerRef} className="pointer-events-auto relative">
+          <div className="sheet-lift">
+            <div className="flex items-center gap-3 px-4 pt-3">
+              <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-[-0.01em]">{event.name}</h1>
+              <span className="flex items-center gap-1.5" title={live ? "Mises à jour en direct" : "Connexion au direct…"}>
+                {live ? (
+                  <span className="signal-dot signal-dot--live size-1.5" />
+                ) : (
+                  <span className="size-1.5 rounded-full border border-t4" />
+                )}
+                <span className={`label text-[10px] ${live ? "text-signal-ink" : "text-t4"}`}>
+                  {live ? "En direct" : "Connexion"}
+                </span>
               </span>
             </div>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSearchOpen(true);
-              }}
-              onFocus={() => setSearchOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && results[0]) {
-                  select(results[0]);
-                  setSearchOpen(false);
-                  e.currentTarget.blur();
-                }
-                if (e.key === "Escape") setSearchOpen(false);
-              }}
-              placeholder="Rechercher un stand, un lieu…"
-              aria-label="Rechercher un lieu"
-              className="w-full rounded-b-2xl bg-transparent px-4 pt-0.5 pb-3 text-base outline-none"
-            />
+            <label className="flex items-center gap-2.5 px-4 pt-1 pb-3">
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0 text-t3" aria-hidden>
+                <circle cx="8.5" cy="8.5" r="5.5" />
+                <path d="m13 13 4 4" strokeLinecap="round" />
+              </svg>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && results[0]) {
+                    select(results[0]);
+                    setSearchOpen(false);
+                    e.currentTarget.blur();
+                  }
+                  if (e.key === "Escape") setSearchOpen(false);
+                }}
+                placeholder="Un stand, un numéro, un service…"
+                aria-label="Rechercher un lieu"
+                className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-t4"
+              />
+            </label>
           </div>
+
           {results.length > 0 && (
-            <ul className="absolute inset-x-0 mt-2 max-h-[50dvh] overflow-y-auto rounded-2xl bg-white py-1 shadow-lg ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10">
+            <ul className="sheet-lift rise absolute inset-x-0 z-10 mt-1.5 max-h-[55dvh] overflow-y-auto py-1.5">
               {results.map((p) => (
                 <li key={p.id}>
                   <button
@@ -425,34 +483,28 @@ export function VisitorMap({
                       select(p);
                       setSearchOpen(false);
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-paper-2"
                   >
-                    <span className="size-3 shrink-0 rounded-full" style={{ background: POI_CATEGORIES[p.category].color }} />
-                    <span className="flex-1 truncate text-sm">{poiTitle(p)}</span>
-                    <span className="text-xs text-zinc-500">{POI_CATEGORIES[p.category].label}</span>
+                    {p.code ? <span className="plate w-11 text-[12px]">{p.code}</span> : <Pictogram category={p.category} size={26} className="mx-[9px]" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-semibold">{p.name}</span>
+                      <span className="block text-[12px] text-t3">{POI_CATEGORIES[p.category].label}</span>
+                    </span>
+                    {p.status !== "open" && <StatusMark status={p.status} className="text-[12px]" />}
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {searchOpen && query.trim() && results.length === 0 && (
-            <p className="absolute inset-x-0 mt-2 rounded-2xl bg-white px-4 py-3 text-sm text-zinc-500 shadow-lg dark:bg-zinc-900">
-              Aucun lieu ne correspond.
-            </p>
+            <p className="sheet-lift absolute inset-x-0 z-10 mt-1.5 px-4 py-3 text-[14px] text-t3">Aucun lieu ne correspond.</p>
           )}
         </div>
 
-        <AnnouncementBanner announcements={announcements} />
-
-        {here && (
-          <p className="pointer-events-auto mx-auto flex max-w-md items-center gap-2 rounded-full bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white shadow">
-            <span className="size-2.5 rounded-full bg-white" />
-            Vous êtes ici : {here.label}
-          </p>
-        )}
-
+        {/* Sur mobile, une fiche ouverte libère la place : seule la recherche reste en haut */}
+        <div className={`flex flex-col gap-2 ${selected ? "max-md:hidden" : ""}`}>
         {categories.length > 1 && (
-          <div className="pointer-events-auto mx-auto flex w-full max-w-md gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+          <div className="pointer-events-auto -mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0">
             {categories.map((c) => {
               const active = filters.has(c);
               return (
@@ -461,18 +513,29 @@ export function VisitorMap({
                   type="button"
                   onClick={() => toggleFilter(c)}
                   aria-pressed={active}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium shadow ring-1 ring-black/5 ${
-                    active ? "text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                  className={`flex shrink-0 items-center gap-2 rounded-sign py-1 pr-3 pl-1 text-[13px] font-semibold shadow-sheet transition-colors ${
+                    active ? "bg-ink text-on-ink" : "bg-sheet text-t1 hover:bg-paper-2"
                   }`}
-                  style={active ? { background: POI_CATEGORIES[c].color } : undefined}
                 >
-                  {!active && <span className="size-2.5 rounded-full" style={{ background: POI_CATEGORIES[c].color }} />}
+                  <Pictogram category={c} size={22} tone={active ? "signal" : "ink"} />
                   {POI_CATEGORIES[c].plural}
                 </button>
               );
             })}
           </div>
         )}
+
+        <AnnouncementBanner announcements={announcements} />
+
+        {here && (
+          <p className="pointer-events-auto flex items-center gap-2.5 self-start rounded-sign bg-signal py-1.5 pr-3 pl-2 text-[13px] font-semibold text-on-signal shadow-sheet">
+            <span className="grid size-4 place-items-center rounded-full bg-on-signal/25">
+              <span className="size-1.5 rounded-full bg-on-signal" />
+            </span>
+            Vous êtes ici · {here.label}
+          </p>
+        )}
+        </div>
       </div>
 
       {/* Bouton de localisation */}
@@ -480,15 +543,16 @@ export function VisitorMap({
         type="button"
         onClick={locate}
         aria-label="Me localiser"
-        className="absolute right-3 grid size-12 place-items-center rounded-full bg-white text-blue-600 shadow-lg ring-1 ring-black/5 transition-[bottom] dark:bg-zinc-900"
-        style={{ bottom: selected ? SHEET_PADDING - 24 : 24 }}
+        className="sheet-lift absolute right-3 grid size-11 place-items-center text-t1 transition-[bottom] duration-300 ease-sign md:right-4 md:bottom-6"
+        style={{ bottom: selected ? SHEET_PADDING - 8 : 24 }}
       >
         {locating ? (
-          <span className="size-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          <span className="size-4 animate-spin rounded-full border-2 border-t1 border-t-transparent" />
         ) : (
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="4" fill={geo ? "currentColor" : "none"} />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <circle cx="12" cy="12" r="6.5" />
+            <circle cx="12" cy="12" r="2.2" fill={geo ? "var(--signal)" : "currentColor"} stroke="none" />
+            <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" strokeLinecap="round" />
           </svg>
         )}
       </button>
@@ -497,8 +561,8 @@ export function VisitorMap({
       {toast && (
         <p
           role="status"
-          className="absolute inset-x-3 mx-auto max-w-md rounded-xl bg-zinc-900/90 px-4 py-2.5 text-center text-sm text-white shadow-lg"
-          style={{ bottom: selected ? SHEET_PADDING + 40 : 88 }}
+          className="rise absolute inset-x-3 mx-auto max-w-sm rounded-sign bg-ink px-4 py-3 text-center text-[13.5px] text-on-ink shadow-lift md:inset-x-auto md:left-4 md:mx-0 md:w-[400px] md:max-w-none"
+          style={{ bottom: selected ? SHEET_PADDING + 52 : 84 }}
         >
           {toast}
         </p>
@@ -507,27 +571,21 @@ export function VisitorMap({
       {/* Fiche du lieu */}
       {selected && (
         <section
+          key={selected.id}
           aria-label={poiTitle(selected)}
-          className="absolute inset-x-0 bottom-0 mx-auto max-h-[60dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:bg-zinc-900"
+          className="sheet-lift rise absolute inset-x-0 bottom-0 max-h-[62dvh] overflow-y-auto rounded-b-none px-5 pt-2.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:inset-x-auto md:bottom-4 md:left-4 md:w-[400px] md:rounded-sign md:pt-5"
         >
+          <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-hair-strong md:hidden" aria-hidden />
           <div className="flex items-start gap-3">
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-                <span className="flex items-center gap-1.5 text-zinc-500">
-                  <span className="size-2.5 rounded-full" style={{ background: POI_CATEGORIES[selected.category].color }} />
-                  {POI_CATEGORIES[selected.category].label}
-                </span>
-                {selected.status !== "open" && (
-                  <span className={`rounded-full px-2 py-0.5 ${POI_STATUSES[selected.status].className}`}>
-                    {POI_STATUSES[selected.status].label}
-                  </span>
-                )}
+            <Pictogram category={selected.category} size={30} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="label">{POI_CATEGORIES[selected.category].label}</span>
+                <StatusMark status={selected.status} className="text-[12px]" />
               </div>
-              <h2 className="mt-1 text-xl font-bold">
+              <h2 className="mt-1 text-[20px] leading-tight font-bold tracking-[-0.02em]">
                 {selected.code && selected.code !== selected.name && (
-                  <span className="mr-2 rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-base dark:bg-zinc-800">
-                    {selected.code}
-                  </span>
+                  <span className="plate mr-2 align-[2px] text-[13px]">{selected.code}</span>
                 )}
                 {selected.name}
               </h2>
@@ -536,48 +594,63 @@ export function VisitorMap({
               type="button"
               onClick={() => select(null)}
               aria-label="Fermer"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+              className="btn btn-ghost btn-icon -mt-1 -mr-2 size-9 min-h-0"
             >
-              ✕
+              <svg viewBox="0 0 16 16" width="14" height="14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                <path d="m3.5 3.5 9 9m0-9-9 9" />
+              </svg>
             </button>
           </div>
+
           {guidance && (
-            <div className="mt-3 flex items-center gap-3 rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
-              <svg
-                viewBox="0 0 24 24"
-                width="22"
-                height="22"
-                className="shrink-0 text-rose-600"
-                style={{ transform: `rotate(${guidance.bearing}deg)` }}
-                aria-hidden
-              >
-                <path d="M12 2 L19 20 L12 16 L5 20 Z" fill="currentColor" />
-              </svg>
-              <p>
-                <strong>{guidance.meters < 5 ? "Vous y êtes" : formatMeters(guidance.meters)}</strong>
-                {guidance.meters >= 5 && (
-                  <>
-                    {" "}
-                    {towards(guidance.direction)} · ~{guidance.minutes} min à pied
-                    <span className="block text-xs text-rose-700/80 dark:text-rose-200/70">à vol d&apos;oiseau</span>
-                  </>
+            <div className="mt-4 flex items-center gap-4 rounded-sign bg-paper-2 p-3">
+              <span className="grid size-12 shrink-0 place-items-center rounded-sign bg-signal text-on-signal">
+                {guidance.meters < 5 ? (
+                  <span className="size-3 rounded-full bg-on-signal" />
+                ) : (
+                  <svg viewBox="0 0 24 24" width="26" height="26" style={{ transform: `rotate(${guidance.bearing}deg)` }} aria-hidden>
+                    <path d="M12 3v18M12 3l-6 6M12 3l6 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 )}
-              </p>
+              </span>
+              {guidance.meters < 5 ? (
+                <p className="text-[17px] font-bold">Vous y êtes</p>
+              ) : (
+                <div className="min-w-0">
+                  <p className="num flex items-baseline gap-2">
+                    <span className="text-[24px] leading-none font-extrabold tracking-[-0.03em]">
+                      {formatMeters(guidance.meters)}
+                    </span>
+                    <span className="text-[13px] font-semibold text-t2">~{guidance.minutes} min</span>
+                  </p>
+                  <p className="mt-1 text-[12.5px] text-t3">{towards(guidance.direction)} · à vol d&apos;oiseau</p>
+                </div>
+              )}
             </div>
           )}
+
           {selected.description && (
-            <p className="mt-3 text-sm whitespace-pre-line text-zinc-600 dark:text-zinc-300">{selected.description}</p>
+            <p className="mt-4 text-[14.5px] leading-relaxed whitespace-pre-line text-t2">{selected.description}</p>
           )}
-          <div className="mt-4 flex gap-2">
-            <button type="button" onClick={() => share(selected)} className="btn-secondary flex-1">
+
+          <div className="mt-5 flex gap-2">
+            <button type="button" onClick={() => share(selected)} className="btn btn-secondary flex-1">
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M10 3v10M6 7l4-4 4 4M4 12v4h12v-4" />
+              </svg>
               Partager
             </button>
           </div>
+          {!origin && (
+            <p className="fine mt-3">
+              Scannez un QR code « Vous êtes ici » ou activez la localisation pour voir la distance.
+            </p>
+          )}
         </section>
       )}
 
       {pois.length === 0 && map && (
-        <p className="absolute inset-x-3 bottom-6 mx-auto max-w-md rounded-xl bg-white px-4 py-3 text-center text-sm text-zinc-500 shadow-lg dark:bg-zinc-900">
+        <p className="sheet absolute inset-x-3 bottom-6 mx-auto max-w-sm px-4 py-3 text-center text-[14px] text-t3 md:left-4 md:mx-0">
           Le plan de cet event est en cours de préparation.
         </p>
       )}

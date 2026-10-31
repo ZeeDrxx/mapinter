@@ -1,46 +1,44 @@
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import type { FeatureCollection, Point } from "geojson";
-import { POI_CATEGORIES, POI_CATEGORY_IDS, type Poi } from "@/lib/poi";
+import { POI_CATEGORY_IDS, type Poi } from "@/lib/poi";
+import { drawPictogram } from "@/lib/pictograms";
+import { mapPalette } from "@/lib/theme";
 
 const SOURCE = "pois";
-const LAYER_SELECTED = "pois-selected";
-const LAYER_STANDS = "pois-stands";
-const LAYER_OTHERS = "pois-others";
+const LAYER = "pois";
 
 /** Calques cliquables pour la sélection d'un lieu. */
-export const POI_HIT_LAYERS = [LAYER_STANDS, LAYER_OTHERS];
+export const POI_HIT_LAYERS = [LAYER];
 
 const PIXEL_RATIO = 2;
+const PLATE = 24; // px CSS
 
-/** Dessine les pastilles de catégorie (cercle coloré + pictogramme) et les enregistre dans la carte. */
+/** Plaques de catégorie (encre, et signal pour la sélection) dessinées une fois par carte. */
 function ensureIcons(map: MapLibreMap) {
+  if (map.hasImage("poi-stand")) return;
+  const c = mapPalette();
+  const font = getComputedStyle(document.documentElement).getPropertyValue("--font-overpass").trim() || "system-ui";
   for (const category of POI_CATEGORY_IDS) {
-    const id = `poi-${category}`;
-    if (map.hasImage(id)) continue;
-    const { color, glyph } = POI_CATEGORIES[category];
-    const cssSize = category === "stand" ? 16 : 28;
-    const size = cssSize * PIXEL_RATIO;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
-    const r = size / 2;
-    ctx.beginPath();
-    ctx.arc(r, r, r - PIXEL_RATIO, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.lineWidth = 2 * PIXEL_RATIO;
-    ctx.strokeStyle = "#ffffff";
-    ctx.stroke();
-    if (glyph) {
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const fontSize = (glyph.length > 1 ? 10 : 14) * PIXEL_RATIO;
-      ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
-      ctx.fillText(glyph, r, r + PIXEL_RATIO * 0.5);
+    for (const selected of [false, true]) {
+      const size = (PLATE + 4) * PIXEL_RATIO;
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext("2d")!;
+      const r = 3 * PIXEL_RATIO;
+      // Liseré papier : la plaque reste lisible sur n'importe quel fond
+      ctx.fillStyle = c.paper;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, r + 2 * PIXEL_RATIO);
+      ctx.fill();
+      ctx.fillStyle = selected ? c.signal : c.ink;
+      ctx.beginPath();
+      ctx.roundRect(2 * PIXEL_RATIO, 2 * PIXEL_RATIO, PLATE * PIXEL_RATIO, PLATE * PIXEL_RATIO, r);
+      ctx.fill();
+      drawPictogram(ctx, category, size / 2, size / 2, PLATE * PIXEL_RATIO * 0.78, selected ? c.onSignal : c.onInk, font);
+      map.addImage(`poi-${category}${selected ? "-selected" : ""}`, ctx.getImageData(0, 0, size, size), {
+        pixelRatio: PIXEL_RATIO,
+      });
     }
-    map.addImage(id, ctx.getImageData(0, 0, size, size), { pixelRatio: PIXEL_RATIO });
   }
 }
 
@@ -50,86 +48,78 @@ function toCollection(pois: Poi[]): FeatureCollection<Point> {
     features: pois.map((p) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-      properties: { id: p.id, category: p.category, status: p.status, label: p.code || p.name, name: p.name },
+      properties: {
+        id: p.id,
+        category: p.category,
+        status: p.status,
+        label: p.category === "stand" ? p.code || p.name : p.name,
+        // Un stand dessiné sur le plan n'a pas besoin de marqueur : la case numérotée suffit.
+        // Scènes et salles gardent leur pictogramme, qui aide à les repérer.
+        linked: Boolean(p.featureId) && p.category === "stand",
+      },
     })),
   };
 }
 
-const selectedFilter = (id: string | null): ExpressionSpecification => ["==", ["get", "id"], id ?? ""];
-const iconOpacity: ExpressionSpecification = ["case", ["==", ["get", "status"], "closed"], 0.4, 1];
-const textPaint = {
-  "text-color": "#18181b",
-  "text-halo-color": "#ffffff",
-  "text-halo-width": 1.5,
-  "text-opacity": iconOpacity,
-  "icon-opacity": iconOpacity,
-};
+const visibleFilter = (selectedId: string | null): ExpressionSpecification => [
+  "any",
+  ["!", ["get", "linked"]],
+  ["==", ["get", "id"], selectedId ?? ""],
+];
+const iconFor = (selectedId: string | null): ExpressionSpecification => [
+  "case",
+  ["==", ["get", "id"], selectedId ?? ""],
+  ["concat", "poi-", ["get", "category"], "-selected"],
+  ["concat", "poi-", ["get", "category"]],
+];
 
 export function setPois(map: MapLibreMap, pois: Poi[], selectedId: string | null = null) {
   const source = map.getSource<GeoJSONSource>(SOURCE);
   if (source) {
     source.setData(toCollection(pois));
-    map.setFilter(LAYER_SELECTED, selectedFilter(selectedId));
+    map.setFilter(LAYER, visibleFilter(selectedId));
+    map.setLayoutProperty(LAYER, "icon-image", iconFor(selectedId));
+    map.setLayoutProperty(LAYER, "symbol-sort-key", ["case", ["==", ["get", "id"], selectedId ?? ""], 1, 0]);
     return;
   }
 
   ensureIcons(map);
+  const c = mapPalette();
   map.addSource(SOURCE, { type: "geojson", data: toCollection(pois) });
+  const faded: ExpressionSpecification = ["case", ["==", ["get", "status"], "closed"], 0.45, 1];
   map.addLayer({
-    id: LAYER_SELECTED,
-    type: "circle",
-    source: SOURCE,
-    filter: selectedFilter(selectedId),
-    paint: {
-      "circle-radius": 20,
-      "circle-color": "#2563eb",
-      "circle-opacity": 0.2,
-      "circle-stroke-color": "#2563eb",
-      "circle-stroke-width": 2,
-    },
-  });
-  // Les stands sont nombreux : ils n'apparaissent qu'en zoomant
-  map.addLayer({
-    id: LAYER_STANDS,
+    id: LAYER,
     type: "symbol",
     source: SOURCE,
-    minzoom: 16,
-    filter: ["==", ["get", "category"], "stand"],
+    filter: visibleFilter(selectedId),
     layout: {
-      "icon-image": "poi-stand",
+      "icon-image": iconFor(selectedId),
       "icon-allow-overlap": true,
+      // Les plaques ne doivent pas masquer les noms des zones et des stands
+      "icon-ignore-placement": true,
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.7, 18, 1],
+      "symbol-sort-key": ["case", ["==", ["get", "id"], selectedId ?? ""], 1, 0],
       "text-field": ["step", ["zoom"], "", 17.5, ["get", "label"]],
       "text-font": ["Noto Sans Bold"],
-      "text-size": 11,
+      "text-size": 11.5,
       "text-anchor": "top",
-      "text-offset": [0, 0.7],
+      "text-offset": [0, 1.25],
+      "text-max-width": 9,
       "text-optional": true,
     },
-    paint: textPaint,
-  });
-  map.addLayer({
-    id: LAYER_OTHERS,
-    type: "symbol",
-    source: SOURCE,
-    filter: ["!=", ["get", "category"], "stand"],
-    layout: {
-      "icon-image": ["concat", "poi-", ["get", "category"]],
-      "icon-allow-overlap": true,
-      "text-field": ["step", ["zoom"], "", 17, ["get", "name"]],
-      "text-font": ["Noto Sans Bold"],
-      "text-size": 12,
-      "text-anchor": "top",
-      "text-offset": [0, 1.1],
-      "text-optional": true,
+    paint: {
+      "icon-opacity": faded,
+      "text-opacity": faded,
+      "text-color": c.ink,
+      "text-halo-color": c.paper,
+      "text-halo-width": 1.4,
     },
-    paint: textPaint,
   });
 }
 
 /** Lieu sous le pointeur, s'il y en a un. */
 export function poiAt(map: MapLibreMap, point: { x: number; y: number }): string | null {
-  const layers = POI_HIT_LAYERS.filter((id) => map.getLayer(id));
-  if (!layers.length) return null;
-  const hit = map.queryRenderedFeatures([point.x, point.y], { layers });
+  if (!map.getLayer(LAYER)) return null;
+  const hit = map.queryRenderedFeatures([point.x, point.y], { layers: POI_HIT_LAYERS });
   return (hit[0]?.properties?.id as string | undefined) ?? null;
 }

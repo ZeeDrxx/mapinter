@@ -12,6 +12,16 @@ function localToIso(value: string) {
   return value ? new Date(value).toISOString() : "";
 }
 
+function StepTitle({ n, title, hint }: { n: string; title: string; hint?: string }) {
+  return (
+    <div className="border-t border-ink pt-3">
+      <p className="num font-mono text-[12px] font-semibold text-t3">{n}</p>
+      <h2 className="h2 mt-1">{title}</h2>
+      {hint && <p className="body mt-1 text-[14px]">{hint}</p>}
+    </div>
+  );
+}
+
 export function EventForm() {
   const [state, action, pending] = useActionState(createEvent, undefined);
   const [name, setName] = useState("");
@@ -23,11 +33,11 @@ export function EventForm() {
   const [bbox, setBBox] = useState<BBox | null>(null);
 
   return (
-    <form action={action} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
-      <section className="card flex flex-col gap-4 self-start">
-        <h2 className="font-semibold">1. Informations</h2>
+    <form action={action} className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
+      <section className="flex flex-col gap-5 self-start">
+        <StepTitle n="01" title="Informations" />
         <div>
-          <label htmlFor="name" className="label">
+          <label htmlFor="name" className="field-label">
             Nom de l&apos;event
           </label>
           <input
@@ -46,11 +56,11 @@ export function EventForm() {
           />
         </div>
         <div>
-          <label htmlFor="slug" className="label">
+          <label htmlFor="slug" className="field-label">
             Adresse publique
           </label>
-          <div className="flex items-center rounded-lg border border-zinc-300 bg-white pl-3 text-sm focus-within:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900">
-            <span className="text-zinc-400">/e/</span>
+          <div className="input flex items-center gap-0.5 font-mono text-[13.5px] focus-within:bg-sheet focus-within:shadow-[inset_0_0_0_1px_var(--hair-strong),inset_0_-2px_0_var(--ink)]">
+            <span className="text-t4">/e/</span>
             <input
               id="slug"
               name="slug"
@@ -60,13 +70,13 @@ export function EventForm() {
                 setSlugEdited(true);
                 setSlug(slugify(e.target.value));
               }}
-              className="w-full bg-transparent px-1 py-2 outline-none"
+              className="min-w-0 flex-1 bg-transparent outline-none"
             />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="starts_at_local" className="label">
+            <label htmlFor="starts_at_local" className="field-label">
               Début
             </label>
             <input
@@ -74,12 +84,12 @@ export function EventForm() {
               type="datetime-local"
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
-              className="input"
+              className="input num"
             />
             <input type="hidden" name="starts_at" value={localToIso(startsAt)} />
           </div>
           <div>
-            <label htmlFor="ends_at_local" className="label">
+            <label htmlFor="ends_at_local" className="field-label">
               Fin
             </label>
             <input
@@ -88,14 +98,14 @@ export function EventForm() {
               value={endsAt}
               min={startsAt || undefined}
               onChange={(e) => setEndsAt(e.target.value)}
-              className="input"
+              className="input num"
             />
             <input type="hidden" name="ends_at" value={localToIso(endsAt)} />
           </div>
         </div>
         <div>
-          <label htmlFor="description" className="label">
-            Description <span className="font-normal text-zinc-400">(facultatif)</span>
+          <label htmlFor="description" className="field-label">
+            Description <span className="font-normal text-t4">· facultatif</span>
           </label>
           <textarea
             id="description"
@@ -108,23 +118,26 @@ export function EventForm() {
         </div>
       </section>
 
-      <section className="card flex flex-col gap-4">
-        <div>
-          <h2 className="font-semibold">2. Zone de l&apos;event</h2>
-          <p className="text-sm text-zinc-500">
-            Recherchez le lieu, puis tracez le rectangle qui englobe tout l&apos;espace de l&apos;event.
-          </p>
-        </div>
+      <section className="flex flex-col gap-5">
+        <StepTitle
+          n="02"
+          title="Zone de l'event"
+          hint="Recherchez le lieu, puis tracez le rectangle qui englobe tout l'espace de l'event."
+        />
         <ZonePicker value={bbox} onChange={setBBox} />
         <input type="hidden" name="bbox" value={bbox?.join(",") ?? ""} />
       </section>
 
-      <div className="flex items-center justify-end gap-3 lg:col-span-2">
-        {state?.error && <p className="mr-auto text-sm text-red-600">{state.error}</p>}
-        <Link href="/dashboard" className="btn-ghost">
+      <div className="flex flex-wrap items-center justify-end gap-3 border-t border-hair pt-5 lg:col-span-2">
+        {state?.error && (
+          <p role="alert" className="mr-auto text-[13.5px] font-semibold text-busy">
+            {state.error}
+          </p>
+        )}
+        <Link href="/dashboard" className="btn btn-ghost">
           Annuler
         </Link>
-        <button type="submit" disabled={pending || !bbox} className="btn-primary">
+        <button type="submit" disabled={pending || !bbox} className="btn btn-primary">
           {pending ? "Création…" : "Créer l'event"}
         </button>
       </div>

@@ -1,9 +1,11 @@
 // Annonces live : définitions partagées entre l'organisateur et la carte visiteur.
 
+// Info : une feuille. Important : marqué du statut « affluence ». Alerte : panneau d'encre plein,
+// comme une signalétique d'urgence ; jamais le signal, réservé à la position.
 export const ANNOUNCEMENT_LEVELS = {
-  info: { label: "Info", className: "bg-blue-600 text-white" },
-  warning: { label: "Important", className: "bg-amber-500 text-white" },
-  alert: { label: "Alerte", className: "bg-red-600 text-white" },
+  info: { label: "Info" },
+  warning: { label: "Important" },
+  alert: { label: "Alerte" },
 } as const;
 
 export type AnnouncementLevel = keyof typeof ANNOUNCEMENT_LEVELS;

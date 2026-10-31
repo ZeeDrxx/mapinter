@@ -92,36 +92,27 @@ export function AnnouncementsPanel({
   }
 
   return (
-    <section className="card flex flex-col gap-4">
-      <div>
-        <h2 className="font-semibold">Annonces live</h2>
-        <p className="text-sm text-zinc-500">
-          Affichées instantanément en haut de la carte de tous les visiteurs connectés.
-          {!isPublished && " Elles seront visibles une fois l'event publié."}
-        </p>
+    <section className="flex flex-col gap-4">
+      <div className="flex items-baseline justify-between border-b border-ink pb-2">
+        <h2 className="label">Annonces live</h2>
+        <span className="fine">
+          {isPublished ? "Affichées en direct chez les visiteurs" : "Visibles une fois l'event publié"}
+        </span>
       </div>
 
-      <form onSubmit={publish} className="flex flex-col gap-3">
+      <form onSubmit={publish} className="well flex flex-col gap-3 p-3">
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value.slice(0, MAX_LENGTH))}
           rows={2}
-          placeholder="ex : La conférence de 14h est déplacée en salle B."
+          placeholder="La conférence de 14h est déplacée en salle B."
           aria-label="Message de l'annonce"
-          className="input"
+          className="input bg-sheet"
         />
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg bg-zinc-100 p-1 text-sm dark:bg-zinc-800">
+          <div className="segmented bg-paper-3" role="radiogroup" aria-label="Niveau">
             {(Object.keys(ANNOUNCEMENT_LEVELS) as AnnouncementLevel[]).map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => setLevel(l)}
-                aria-pressed={level === l}
-                className={`rounded-md px-3 py-1 font-medium ${
-                  level === l ? ANNOUNCEMENT_LEVELS[l].className : "text-zinc-500"
-                }`}
-              >
+              <button key={l} type="button" role="radio" aria-checked={level === l} onClick={() => setLevel(l)}>
                 {ANNOUNCEMENT_LEVELS[l].label}
               </button>
             ))}
@@ -130,7 +121,7 @@ export function AnnouncementsPanel({
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
             aria-label="Durée d'affichage"
-            className="input w-auto"
+            className="input min-h-[38px] w-auto bg-sheet py-2 text-[13px]"
           >
             {DURATIONS.map((d) => (
               <option key={d.value} value={d.value}>
@@ -138,29 +129,34 @@ export function AnnouncementsPanel({
               </option>
             ))}
           </select>
-          <span className="ml-auto text-xs text-zinc-400">
+          <span className="num ml-auto font-mono text-[11.5px] text-t4">
             {message.length}/{MAX_LENGTH}
           </span>
-          <button type="submit" disabled={busy || !message.trim()} className="btn-primary">
+          <button type="submit" disabled={busy || !message.trim()} className="btn btn-primary btn-sm">
             {busy ? "Envoi…" : "Diffuser"}
           </button>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-[13px] font-semibold text-busy">{error}</p>}
       </form>
 
       {list.length > 0 && (
-        <ul className="flex flex-col divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul>
           {list.map((a) => {
             const online = isLive(a, now);
             return (
-              <li key={a.id} className="flex items-start gap-3 py-3">
-                <span className={`mt-0.5 rounded-full px-2 py-0.5 text-xs font-medium ${ANNOUNCEMENT_LEVELS[a.level].className}`}>
+              <li key={a.id} className="flex items-start gap-3 border-b border-hair py-3">
+                <span
+                  className={`label mt-0.5 w-[74px] shrink-0 text-[10px] ${
+                    a.level === "alert" ? "text-t1" : a.level === "warning" ? "text-busy" : ""
+                  }`}
+                >
                   {ANNOUNCEMENT_LEVELS[a.level].label}
                 </span>
-                <div className="flex-1">
-                  <p className={`text-sm whitespace-pre-line ${online ? "" : "text-zinc-400 line-through"}`}>{a.message}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {timeFormat.format(new Date(a.createdAt))} ·{" "}
+                <div className="min-w-0 flex-1">
+                  <p className={`text-[14px] whitespace-pre-line ${online ? "" : "text-t4 line-through"}`}>{a.message}</p>
+                  <p className="num mt-1 flex items-center gap-1.5 text-[12px] text-t3">
+                    {online && <span className="signal-dot signal-dot--live size-1.5" aria-hidden />}
+                    {timeFormat.format(new Date(a.createdAt))} · 
                     {online
                       ? a.expiresAt
                         ? `en ligne jusqu'à ${timeFormat.format(new Date(a.expiresAt))}`
@@ -171,7 +167,7 @@ export function AnnouncementsPanel({
                   </p>
                 </div>
                 {online && (
-                  <button type="button" onClick={() => withdraw(a.id)} className="btn-ghost px-2 py-1 text-red-600">
+                  <button type="button" onClick={() => withdraw(a.id)} className="btn btn-ghost btn-sm -mr-2">
                     Retirer
                   </button>
                 )}

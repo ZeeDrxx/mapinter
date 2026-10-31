@@ -114,17 +114,22 @@ export function ZonePicker({
         }}
       />
 
-      <div className="relative h-[460px] overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-        <div ref={containerRef} className="absolute inset-0" />
+      <div className="relative h-[460px] overflow-hidden rounded-sign bg-paper-2">
+        <div ref={containerRef} className="map-fill absolute inset-0" />
         {!map && (
-          <div className="absolute inset-0 grid place-items-center bg-zinc-100 text-sm text-zinc-500 dark:bg-zinc-900">
-            Chargement de la carte…
+          <div className="absolute inset-0 grid place-items-center">
+            <p className="label">Chargement de la carte…</p>
           </div>
         )}
         {drawing && (
-          <div className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-zinc-900/85 px-4 py-1.5 text-sm text-white shadow">
-            Cliquez-glissez pour tracer la zone · Échap pour annuler
-          </div>
+          <p className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-sign bg-ink px-3.5 py-2 text-[13px] font-medium text-on-ink shadow-lift">
+            Cliquez-glissez pour tracer la zone · Échap pour annuler
+          </p>
+        )}
+        {size && !drawing && (
+          <p className="num absolute bottom-3 left-3 rounded-sign bg-sheet px-2.5 py-1.5 font-mono text-[12px] font-semibold shadow-sheet">
+            {formatMeters(size.width)} × {formatMeters(size.height)}
+          </p>
         )}
       </div>
 
@@ -133,23 +138,19 @@ export function ZonePicker({
           type="button"
           onClick={() => setDrawing((d) => !d)}
           disabled={!map}
-          className={drawing ? "btn-secondary" : "btn-primary"}
+          className={`btn ${drawing ? "btn-secondary" : "btn-primary"}`}
         >
           {drawing ? "Annuler le tracé" : value ? "Redessiner la zone" : "Dessiner la zone"}
         </button>
-        <button type="button" onClick={applyCurrentView} disabled={!map || drawing} className="btn-secondary">
+        <button type="button" onClick={applyCurrentView} disabled={!map || drawing} className="btn btn-secondary">
           Utiliser la vue actuelle
         </button>
         {value && map && !drawing && (
-          <button type="button" onClick={() => fitZone(map, value)} className="btn-ghost">
+          <button type="button" onClick={() => fitZone(map, value)} className="btn btn-ghost">
             Recentrer
           </button>
         )}
-        <p className="ml-auto text-sm text-zinc-500">
-          {size
-            ? `Zone : ${formatMeters(size.width)} × ${formatMeters(size.height)}`
-            : "Aucune zone définie"}
-        </p>
+        {!value && <p className="fine ml-auto">Aucune zone définie</p>}
       </div>
     </div>
   );
@@ -197,23 +198,24 @@ function PlaceSearch({ onSelect }: { onSelect: (bbox: BBox) => void }) {
               search();
             }
           }}
-          placeholder="Rechercher le lieu (ex : Paris Expo Porte de Versailles)"
+          placeholder="Le lieu de l'event (ex : Paris Expo Porte de Versailles)"
+          aria-label="Rechercher le lieu"
           className="input flex-1"
         />
-        <button type="button" onClick={search} className="btn-secondary" disabled={status === "loading"}>
+        <button type="button" onClick={search} className="btn btn-secondary" disabled={status === "loading"}>
           {status === "loading" ? "Recherche…" : "Rechercher"}
         </button>
       </div>
-      {status === "empty" && <p className="mt-1 text-sm text-zinc-500">Aucun résultat.</p>}
-      {status === "error" && <p className="mt-1 text-sm text-red-600">La recherche a échoué, réessayez.</p>}
+      {status === "empty" && <p className="fine mt-1.5">Aucun résultat.</p>}
+      {status === "error" && <p className="mt-1.5 text-[13px] font-semibold text-busy">La recherche a échoué, réessayez.</p>}
       {results.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+        <ul className="sheet-lift rise absolute z-10 mt-1.5 w-full overflow-hidden py-1">
           {results.map((r) => (
             <li key={r.place_id}>
               <button
                 type="button"
                 onClick={() => select(r)}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="w-full px-3.5 py-2.5 text-left text-[13.5px] transition-colors hover:bg-paper-2"
               >
                 {r.display_name}
               </button>

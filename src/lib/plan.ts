@@ -5,13 +5,14 @@ import type { LngLat } from "./geo";
 // Éléments du plan dessiné
 // ---------------------------------------------------------------------------
 
+// Le rendu de chaque type (encre plus ou moins dense) est dans components/map/plan-layers.ts.
 export const PLAN_KINDS = {
-  hall: { label: "Hall / bâtiment", color: "#94a3b8", opacity: 0.3 },
-  zone: { label: "Zone", color: "#60a5fa", opacity: 0.25 },
-  stand: { label: "Stand", color: "#f59e0b", opacity: 0.6 },
-  stage: { label: "Scène", color: "#a855f7", opacity: 0.55 },
-  obstacle: { label: "Obstacle / mur", color: "#3f3f46", opacity: 0.8 },
-  path: { label: "Chemin / allée", color: "#10b981", opacity: 1 },
+  hall: { label: "Hall / bâtiment" },
+  zone: { label: "Zone" },
+  stand: { label: "Stand" },
+  stage: { label: "Scène" },
+  obstacle: { label: "Obstacle / mur" },
+  path: { label: "Chemin / allée" },
 } as const;
 
 export type PlanKind = keyof typeof PLAN_KINDS;

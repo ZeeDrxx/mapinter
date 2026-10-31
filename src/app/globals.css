@@ -1,36 +1,489 @@
+/*
+  MapInter · « Signalétique »
+  ─────────────────────────────────────────────────────────────
+  MapInter est un panneau d'orientation : on doit le lire de loin, du premier coup.
+  Un seul signal (vermillon) : la position, la sélection, le direct. Rien d'autre.
+  Papier et encre : l'encre parle en opacités, les filets remplacent les boîtes.
+  Trois pixels de rayon, jamais plus. Les pastilles rondes sont réservées au signal.
+  Les catégories se reconnaissent à leur pictogramme, pas à leur couleur.
+  Un statut s'affiche toujours avec une icône et un mot, jamais avec une couleur seule.
+  Les numéros vivent sur des plaques (B12), en chasse fixe, comme les numéros de salle.
+  Une seule courbe pour tous les mouvements.
+  ─────────────────────────────────────────────────────────────
+  Les couleurs de la carte (MapLibre) sont dans src/lib/theme.ts : les modifier en même temps.
+*/
 @import "tailwindcss";
 
-:root {
-  --background: #fafafa;
-  --foreground: #18181b;
-}
+@custom-variant dark (@media (prefers-color-scheme: dark));
 
+/* Le thème Tailwind est réduit à la marque : pas de palette par défaut, un seul rayon. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-*: initial;
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+  --color-t4: var(--t4);
+  --color-hair: var(--hair);
+  --color-hair-strong: var(--hair-strong);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-signal-soft: var(--signal-soft);
+  --color-on-signal: var(--on-signal);
+  --color-on-ink: var(--on-ink);
+  --color-ok: var(--ok);
+  --color-busy: var(--busy);
+  --color-busy-soft: var(--busy-soft);
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+
+  --font-sans: var(--font-overpass), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-overpass-mono), ui-monospace, monospace;
+
+  --radius-*: initial;
+  --radius-sign: 3px;
+
+  --ease-*: initial;
+  --ease-sign: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --shadow-*: initial;
+  --shadow-sheet: var(--shadow);
+  --shadow-lift: var(--shadow-lift);
 }
 
+/* ── Tokens ──────────────────────────────────────────────── */
+
+:root {
+  color-scheme: light;
+
+  /* Le papier d'un plan imprimé ; l'encre est tout ce qui est écrit dessus. */
+  --paper: #f4f3ef;
+  --paper-2: #e9e7e1;
+  --paper-3: #dcd9d1;
+  --sheet: #ffffff;
+  --ink: #15171a;
+  --on-ink: #f4f3ef;
+
+  /* L'échelle d'encre (AA sur paper et paper-2 jusqu'à t3). */
+  --t1: var(--ink);
+  --t2: color-mix(in srgb, var(--ink) 82%, transparent);
+  --t3: color-mix(in srgb, var(--ink) 64%, transparent);
+  --t4: color-mix(in srgb, var(--ink) 38%, transparent);
+  --hair: color-mix(in srgb, var(--ink) 11%, transparent);
+  --hair-strong: color-mix(in srgb, var(--ink) 22%, transparent);
+
+  /* Le signal : en aplat (#d63b22, blanc dessus 4,7:1) ; en texte, une encre plus profonde. */
+  --signal: #d63b22;
+  --signal-ink: #b5301a;
+  --signal-soft: #f8e1da;
+  --on-signal: #ffffff;
+
+  /* Statuts, distincts du signal. */
+  --ok: #2d7a4f;
+  --busy: #9a5b00;
+  --busy-soft: #f5ead6;
+
+  --shadow:
+    0 1px 2px -1px rgb(21 23 26 / 0.12),
+    0 12px 32px -16px rgb(21 23 26 / 0.22);
+  --shadow-lift:
+    0 2px 4px -2px rgb(21 23 26 / 0.14),
+    0 28px 64px -28px rgb(21 23 26 / 0.34);
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Le sombre est conçu, pas inversé : un hall éteint, le signal s'allume. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --foreground: #f4f4f5;
+    color-scheme: dark;
+    --paper: #0e0f11;
+    --paper-2: #18191c;
+    --paper-3: #232529;
+    --sheet: #1b1d20;
+    --ink: #ecebe6;
+    --on-ink: #15171a;
+    --signal: #ff5a3c;
+    --signal-ink: #ff8266;
+    --signal-soft: #3a1a13;
+    --on-signal: #15171a;
+    --ok: #5bbf87;
+    --busy: #e3a63c;
+    --busy-soft: #2e2413;
+    --shadow:
+      0 1px 2px -1px rgb(0 0 0 / 0.6),
+      0 12px 32px -16px rgb(0 0 0 / 0.7);
+    --shadow-lift:
+      0 2px 4px -2px rgb(0 0 0 / 0.6),
+      0 28px 64px -28px rgb(0 0 0 / 0.8);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+/* ── Base ────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    background: var(--paper);
+    color: var(--t1);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--paper);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  ::selection {
+    background: var(--signal);
+    color: var(--on-signal);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: var(--radius-sign);
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
+
+/* ── Composants ──────────────────────────────────────────── */
+
+@layer components {
+  .page {
+    width: 100%;
+    max-width: 1120px;
+    margin-inline: auto;
+    padding: 40px 24px 64px;
+  }
+
+  /* Typographie */
+  .label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1.4;
+    color: var(--t3);
+  }
+  .h1 {
+    font-size: clamp(1.75rem, 1.35rem + 1.4vw, 2.4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  .h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+  }
+  .lead {
+    font-size: 1.05rem;
+    line-height: 1.55;
+    color: var(--t2);
+    max-width: 52ch;
+    text-wrap: pretty;
+  }
+  .body {
+    color: var(--t3);
+    text-wrap: pretty;
+  }
+  .fine {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--t3);
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* La plaque : un numéro de stand ou de salle, comme sur un panneau. */
+  .plate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.2em;
+    padding: 0.2em 0.45em 0.1em;
+    border-radius: var(--radius-sign);
+    background: var(--ink);
+    color: var(--on-ink);
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.85em;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .plate--signal {
+    background: var(--signal);
+    color: var(--on-signal);
+  }
+
+  /* Boutons : des aplats, jamais de contour. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: var(--radius-sign);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    transition:
+      background-color 200ms var(--ease),
+      color 200ms var(--ease),
+      opacity 200ms var(--ease);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ink) 86%, var(--paper));
+  }
+  .btn-signal {
+    background: var(--signal);
+    color: var(--on-signal);
+  }
+  .btn-signal:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--signal) 88%, var(--ink));
+  }
+  .btn-secondary {
+    background: var(--paper-2);
+    color: var(--t1);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--paper-3);
+  }
+  .btn-ghost {
+    color: var(--t2);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--paper-2);
+    color: var(--t1);
+  }
+  .btn-sm {
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+  .btn-icon {
+    min-height: 40px;
+    width: 40px;
+    padding: 0;
+  }
+
+  /* Champs : un aplat et un filet en pied, qui devient encre au focus. */
+  .input {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px 9px;
+    border-radius: var(--radius-sign);
+    background: var(--paper-2);
+    box-shadow: inset 0 -1px 0 var(--hair-strong);
+    outline: none;
+    transition: box-shadow 200ms var(--ease), background-color 200ms var(--ease);
+  }
+  .input::placeholder {
+    color: var(--t4);
+  }
+  .input:focus {
+    background: var(--sheet);
+    box-shadow:
+      inset 0 0 0 1px var(--hair-strong),
+      inset 0 -2px 0 var(--ink);
+  }
+  textarea.input {
+    resize: vertical;
+  }
+  select.input {
+    appearance: none;
+    padding-right: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2315171a' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--t2);
+  }
+
+  /* Surfaces */
+  .sheet {
+    background: var(--sheet);
+    border-radius: var(--radius-sign);
+    box-shadow: var(--shadow);
+  }
+  .sheet-lift {
+    background: var(--sheet);
+    border-radius: var(--radius-sign);
+    box-shadow: var(--shadow-lift);
+  }
+  .well {
+    background: var(--paper-2);
+    border-radius: var(--radius-sign);
+  }
+  .rule {
+    border: 0;
+    border-top: 1px solid var(--hair);
+  }
+
+  /* Contrôle segmenté (onglets) */
+  .segmented {
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--radius-sign);
+    background: var(--paper-2);
+  }
+  .segmented > button {
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--t3);
+    transition: background-color 200ms var(--ease), color 200ms var(--ease);
+  }
+  .segmented > button[aria-pressed="true"],
+  .segmented > button[aria-checked="true"],
+  .segmented > button[aria-selected="true"] {
+    background: var(--sheet);
+    color: var(--t1);
+    box-shadow: 0 1px 2px rgb(21 23 26 / 0.12);
+  }
+
+  /* Le point signal : position, direct. */
+  .signal-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--signal);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 22%, transparent);
+  }
+  .signal-dot--live {
+    animation: pulse 2s var(--ease) infinite;
+  }
+
+  .skeleton {
+    background: var(--paper-2);
+    border-radius: var(--radius-sign);
+    animation: breathe 1.6s var(--ease) infinite;
+  }
+
+  .rise {
+    animation: rise 320ms var(--ease) both;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--signal) 45%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--signal) 0%, transparent);
+  }
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── MapLibre ──────────────────────────────────────────────── */
+
+/* Sa feuille de style, hors couche, impose position relative au conteneur et bat l'utilitaire absolute
+   de Tailwind, en couche : la carte aurait une hauteur nulle. */
+.map-fill {
+  position: absolute !important;
+  inset: 0;
+}
+
+/* Contrôles à la règle des 3 px */
+
+.maplibregl-ctrl.maplibregl-ctrl-group {
+  border-radius: var(--radius-sign);
+  background: var(--sheet);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--hair) !important;
+}
+@media (prefers-color-scheme: dark) {
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+    filter: invert(1);
+  }
+}
+.maplibregl-ctrl-attrib {
+  border-radius: var(--radius-sign);
+  font-family: var(--font-sans);
+}
+.maplibregl-canvas {
+  outline: none;
+}
+/* Sur mobile, on zoome au doigt : les boutons gêneraient l'en-tête */
+@media (max-width: 767px) {
+  .maplibregl-ctrl-top-right {
+    display: none;
+  }
+}
+
+/* ── Impression des affiches ───────────────────────────────── */
 
 @page {
   size: A4 portrait;
   margin: 12mm;
 }
-
 @media print {
+  :root {
+    color-scheme: light;
+  }
   body {
     background: #ffffff;
     print-color-adjust: exact;
@@ -41,34 +494,5 @@ body {
   }
   .qr-sheet:last-child {
     break-after: auto;
-  }
-}
-
-@layer components {
-  .btn-primary,
-  .btn-secondary,
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
-  }
-  .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
-  }
-  .btn-secondary {
-    @apply border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800;
-  }
-  .btn-ghost {
-    @apply text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800;
-  }
-  .input {
-    @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900;
-  }
-  .label {
-    @apply mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300;
-  }
-  .page {
-    @apply mx-auto w-full max-w-6xl px-6 py-8;
-  }
-  .card {
-    @apply rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900;
   }
 }

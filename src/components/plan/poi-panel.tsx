@@ -21,6 +21,9 @@ import { ringCentroid, type PlanCollection } from "@/lib/plan";
 import type { LngLat } from "@/lib/geo";
 import { useAutosave } from "./use-autosave";
 import { useDragMarker } from "./use-drag-marker";
+import { ErrorText, Hint, Section, Selection } from "./panel-ui";
+import { Pictogram } from "@/components/ui/pictogram";
+import { StatusMark } from "@/components/ui/status";
 
 type Patch = Partial<Omit<Poi, "id">>;
 
@@ -178,7 +181,7 @@ export function PoiPanel({
     map,
     selected,
     (id, [lng, lat]) => update(id, { lng, lat }, { immediate: true }),
-    "size-9 cursor-grab rounded-full border-[3px] border-blue-600 bg-blue-600/10",
+    "size-10 cursor-grab rounded-sign border-2 border-dashed border-signal",
   );
 
   function focus(poi: Poi) {
@@ -193,48 +196,56 @@ export function PoiPanel({
     : [...pois].sort((a, b) => poiTitle(a).localeCompare(poiTitle(b), "fr", { numeric: true }));
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setAdding(false)} className={adding ? "btn-secondary" : "btn-primary"}>
+    <div className="flex flex-col gap-7">
+      <Section title="Mode">
+        <div className="segmented" role="radiogroup" aria-label="Mode">
+          <button type="button" role="radio" aria-checked={!adding} onClick={() => setAdding(false)}>
             Sélection
           </button>
           <button
             type="button"
+            role="radio"
+            aria-checked={adding}
+           
             onClick={() => {
               setAdding(true);
               onSelect(null);
             }}
-            className={adding ? "btn-primary" : "btn-secondary"}
           >
             + Ajouter un lieu
           </button>
         </div>
-        <p className="mt-2 text-sm text-zinc-500">
+        <Hint>
           {adding
             ? "Cliquez sur la carte pour placer le lieu. Échap pour arrêter."
             : "Cliquez sur un lieu pour le modifier, glissez son marqueur pour le déplacer."}
-        </p>
-      </div>
-
-      {adding && (
-        <div>
-          <label htmlFor="add-category" className="label">
-            Type de lieu
-          </label>
-          <CategorySelect id="add-category" value={addCategory} onChange={setAddCategory} />
-        </div>
-      )}
+        </Hint>
+        {adding && (
+          <div>
+            <p className="field-label">Type de lieu</p>
+            <CategoryPicker value={addCategory} onChange={setAddCategory} />
+          </div>
+        )}
+      </Section>
 
       {candidates.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
-          <p className="text-amber-900 dark:text-amber-200">
-            {candidates.length} stand(s) ou scène(s) du dessin n&apos;ont pas encore de lieu.
+        <section className="flex items-center gap-3 rounded-sign bg-ink p-3.5 text-on-ink">
+          <p className="min-w-0 flex-1 text-[13px] leading-snug">
+            {candidates.length > 1 ? (
+              <>
+                <strong className="num font-mono">{candidates.length}</strong> stands ou scènes du dessin n&apos;ont pas
+                encore de fiche.
+              </>
+            ) : (
+              <>
+                <strong className="num font-mono">1</strong> stand ou scène du dessin n&apos;a pas encore de fiche.
+              </>
+            )}
           </p>
-          <button type="button" onClick={generateFromPlan} disabled={pending > 0} className="btn-secondary mt-2 w-full">
-            Créer les lieux depuis le dessin
+          <button type="button" onClick={generateFromPlan} disabled={pending > 0} className="btn btn-signal btn-sm shrink-0">
+            Créer les fiches
           </button>
-        </div>
+        </section>
       )}
 
       {selected && (
@@ -246,67 +257,68 @@ export function PoiPanel({
         />
       )}
 
-      <div className="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-        <div className="flex items-center justify-between">
-          <p className="label mb-0">Lieux ({pois.length})</p>
-          <span className="text-xs text-zinc-500">
-            {pending > 0 ? "Enregistrement…" : error ? "" : "Enregistrés automatiquement"}
-          </span>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+      <Section title={`Lieux · ${pois.length}`} aside={pending > 0 ? "Enregistrement…" : error ? undefined : "Enregistrés automatiquement"}>
+        {error && <ErrorText>{error}</ErrorText>}
         {pois.length > 0 && (
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher un lieu, un numéro…"
+            aria-label="Rechercher un lieu"
             className="input"
           />
         )}
-        <ul className="flex flex-col">
+        <ul className="-mx-2 flex flex-col">
           {list.map((p) => (
             <li key={p.id}>
               <button
                 type="button"
                 onClick={() => focus(p)}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-                  p.id === selectedId ? "bg-blue-50 dark:bg-blue-950/40" : ""
+                aria-current={p.id === selectedId}
+                className={`flex w-full items-center gap-2.5 rounded-sign px-2 py-1.5 text-left text-[13.5px] transition-colors hover:bg-paper-2 ${
+                  p.id === selectedId ? "bg-paper-2" : ""
                 }`}
               >
-                <span className="size-2.5 shrink-0 rounded-full" style={{ background: POI_CATEGORIES[p.category].color }} />
-                <span className="flex-1 truncate">{poiTitle(p)}</span>
-                {p.status !== "open" && <span className="text-xs text-zinc-500">{POI_STATUSES[p.status].label}</span>}
+                <Pictogram category={p.category} size={20} tone={p.id === selectedId ? "signal" : "ink"} />
+                <span className="min-w-0 flex-1 truncate">
+                  {p.code && p.code !== p.name && <span className="mr-1.5 font-mono text-[12px] font-semibold text-t3">{p.code}</span>}
+                  {p.name}
+                </span>
+                {p.status !== "open" && <StatusMark status={p.status} className="text-[11.5px]" />}
               </button>
             </li>
           ))}
         </ul>
         {pois.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            Aucun lieu pour l&apos;instant. Ajoutez-en sur la carte ou générez-les depuis les stands dessinés.
-          </p>
+          <p className="fine">Aucun lieu pour l&apos;instant. Ajoutez-en sur la carte ou créez-les depuis les stands dessinés.</p>
         )}
-      </div>
+      </Section>
     </div>
   );
 }
 
-function CategorySelect({
-  id,
-  value,
-  onChange,
-}: {
-  id: string;
-  value: PoiCategory;
-  onChange: (c: PoiCategory) => void;
-}) {
+/** Choix de catégorie par pictogramme, comme sur un panneau. */
+function CategoryPicker({ value, onChange }: { value: PoiCategory; onChange: (c: PoiCategory) => void }) {
   return (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value as PoiCategory)} className="input">
+    <div className="grid grid-cols-5 gap-1" role="radiogroup" aria-label="Type de lieu">
       {POI_CATEGORY_IDS.map((c) => (
-        <option key={c} value={c}>
-          {POI_CATEGORIES[c].label}
-        </option>
+        <button
+          key={c}
+          type="button"
+          role="radio"
+          aria-checked={value === c}
+          title={POI_CATEGORIES[c].label}
+          onClick={() => onChange(c)}
+          className={`flex flex-col items-center gap-1 rounded-sign px-1 pt-2 pb-1.5 text-[10.5px] leading-tight font-semibold transition-colors ${
+            value === c ? "bg-ink text-on-ink" : "bg-paper-2 text-t2 hover:bg-paper-3"
+          }`}
+        >
+          <Pictogram category={c} size={22} tone={value === c ? "signal" : "ink"} />
+          <span className="w-full truncate text-center">{POI_CATEGORIES[c].label.split(" ")[0]}</span>
+        </button>
       ))}
-    </select>
+    </div>
   );
 }
 
@@ -320,17 +332,24 @@ function SelectedPoi({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
-      <p className="text-sm font-semibold">Lieu sélectionné</p>
-      <div className="grid grid-cols-[1fr_6rem] gap-2">
+    <Selection title="Lieu sélectionné" aside={POI_CATEGORIES[poi.category].label}>
+      <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
         <div>
-          <label htmlFor="poi-category" className="label">
-            Type
+          <label htmlFor="poi-name" className="field-label">
+            Nom
           </label>
-          <CategorySelect id="poi-category" value={poi.category} onChange={(category) => onUpdate({ category }, true)} />
+          <input
+            id="poi-name"
+            value={poi.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            onBlur={(e) => {
+              if (!e.target.value.trim()) onUpdate({ name: POI_CATEGORIES[poi.category].label }, true);
+            }}
+            className="input"
+          />
         </div>
         <div>
-          <label htmlFor="poi-code" className="label">
+          <label htmlFor="poi-code" className="field-label">
             Numéro
           </label>
           <input
@@ -338,26 +357,16 @@ function SelectedPoi({
             value={poi.code ?? ""}
             onChange={(e) => onUpdate({ code: e.target.value || null })}
             placeholder="B12"
-            className="input"
+            className="input font-mono"
           />
         </div>
       </div>
       <div>
-        <label htmlFor="poi-name" className="label">
-          Nom
-        </label>
-        <input
-          id="poi-name"
-          value={poi.name}
-          onChange={(e) => onUpdate({ name: e.target.value })}
-          onBlur={(e) => {
-            if (!e.target.value.trim()) onUpdate({ name: POI_CATEGORIES[poi.category].label }, true);
-          }}
-          className="input"
-        />
+        <p className="field-label">Type</p>
+        <CategoryPicker value={poi.category} onChange={(category) => onUpdate({ category }, true)} />
       </div>
       <div>
-        <label htmlFor="poi-description" className="label">
+        <label htmlFor="poi-description" className="field-label">
           Description
         </label>
         <textarea
@@ -370,27 +379,18 @@ function SelectedPoi({
         />
       </div>
       <div>
-        <p className="label">État</p>
-        <div className="grid grid-cols-3 gap-1">
+        <p className="field-label">État · visible en direct</p>
+        <div className="segmented" role="radiogroup" aria-label="État">
           {(Object.keys(POI_STATUSES) as PoiStatus[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onUpdate({ status: s }, true)}
-              className={`rounded-md border px-2 py-1 text-xs font-medium ${
-                poi.status === s
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
-              }`}
-            >
-              {POI_STATUSES[s].label}
+            <button key={s} type="button" role="radio" aria-checked={poi.status === s} onClick={() => onUpdate({ status: s }, true)}>
+              <StatusMark status={s} className="text-[12px]" />
             </button>
           ))}
         </div>
       </div>
-      <button type="button" onClick={onDelete} className="btn-ghost justify-start px-0 text-red-600">
+      <button type="button" onClick={onDelete} className="btn btn-ghost btn-sm -ml-3 self-start">
         Supprimer le lieu
       </button>
-    </div>
+    </Selection>
   );
 }

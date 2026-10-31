@@ -41,8 +41,8 @@ export function ZonePreview({
   }, [map, bbox, image, plan, pois]);
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 ${className ?? ""}`}>
-      <div ref={containerRef} className="absolute inset-0" />
+    <div className={`relative overflow-hidden rounded-sign bg-paper-2 ${className ?? ""}`}>
+      <div ref={containerRef} className="map-fill absolute inset-0" />
     </div>
   );
 }

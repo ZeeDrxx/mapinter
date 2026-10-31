@@ -1,25 +1,27 @@
 // Points d'intérêt : définitions partagées entre l'éditeur et la carte visiteur.
 
+// Les catégories se distinguent par leur pictogramme (lib/pictograms.ts), pas par une couleur.
 export const POI_CATEGORIES = {
-  stand: { label: "Stand", plural: "Stands", color: "#d97706", glyph: "" },
-  stage: { label: "Scène", plural: "Scènes", color: "#9333ea", glyph: "♪" },
-  room: { label: "Salle", plural: "Salles", color: "#0284c7", glyph: "▣" },
-  food: { label: "Restauration", plural: "Restauration", color: "#ea580c", glyph: "R" },
-  toilet: { label: "Toilettes", plural: "Toilettes", color: "#0891b2", glyph: "WC" },
-  info: { label: "Accueil / info", plural: "Accueil", color: "#2563eb", glyph: "i" },
-  first_aid: { label: "Secours", plural: "Secours", color: "#dc2626", glyph: "+" },
-  entrance: { label: "Entrée", plural: "Entrées", color: "#16a34a", glyph: "↓" },
-  exit: { label: "Sortie", plural: "Sorties", color: "#15803d", glyph: "↑" },
-  other: { label: "Autre", plural: "Autres", color: "#52525b", glyph: "•" },
+  stand: { label: "Stand", plural: "Stands" },
+  stage: { label: "Scène", plural: "Scènes" },
+  room: { label: "Salle", plural: "Salles" },
+  food: { label: "Restauration", plural: "Restauration" },
+  toilet: { label: "Toilettes", plural: "Toilettes" },
+  info: { label: "Accueil / info", plural: "Accueil" },
+  first_aid: { label: "Secours", plural: "Secours" },
+  entrance: { label: "Entrée", plural: "Entrées" },
+  exit: { label: "Sortie", plural: "Sorties" },
+  other: { label: "Autre", plural: "Autres" },
 } as const;
 
 export type PoiCategory = keyof typeof POI_CATEGORIES;
 export const POI_CATEGORY_IDS = Object.keys(POI_CATEGORIES) as PoiCategory[];
 
+/** Toujours affichés avec leur forme et leur mot (components/ui/status.tsx). */
 export const POI_STATUSES = {
-  open: { label: "Ouvert", className: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" },
-  busy: { label: "Affluence", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
-  closed: { label: "Fermé", className: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
+  open: { label: "Ouvert" },
+  busy: { label: "Affluence" },
+  closed: { label: "Fermé" },
 } as const;
 
 export type PoiStatus = keyof typeof POI_STATUSES;
@@ -66,9 +68,9 @@ export function rowToPoi(row: PoiRow): Poi {
   };
 }
 
-/** Libellé principal : « B12 · Acme » si un numéro existe. */
+/** Libellé principal : « B12 · Acme » si un numéro existe. */
 export function poiTitle(p: Pick<Poi, "name" | "code">): string {
-  return p.code && p.code !== p.name ? `${p.code} · ${p.name}` : p.name;
+  return p.code && p.code !== p.name ? `${p.code} · ${p.name}` : p.name;
 }
 
 const normalize = (s: string) =>
