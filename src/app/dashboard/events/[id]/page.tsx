@@ -7,6 +7,8 @@ import { eventBBox, formatEventDates, getMyEvent } from "@/lib/events";
 import { getEventPlan } from "@/lib/layers";
 import { listPois } from "@/lib/pois";
 import { listAnchors } from "@/lib/anchors";
+import { listAnnouncements } from "@/lib/announcements";
+import { AnnouncementsPanel } from "./announcements-panel";
 import { bboxSizeMeters, formatMeters } from "@/lib/geo";
 import { setPublished } from "./actions";
 
@@ -25,10 +27,11 @@ async function EventDetail({ params }: Pick<PageProps<"/dashboard/events/[id]">,
   const event = await getMyEvent(id);
   if (!event) notFound();
 
-  const [{ image, drawn }, pois, anchors] = await Promise.all([
+  const [{ image, drawn }, pois, anchors, announcements] = await Promise.all([
     getEventPlan(event.id),
     listPois(event.id),
     listAnchors(event.id),
+    listAnnouncements(event.id),
   ]);
   const bbox = eventBBox(event);
   const size = bboxSizeMeters(bbox);
@@ -124,6 +127,7 @@ async function EventDetail({ params }: Pick<PageProps<"/dashboard/events/[id]">,
           <p className="text-sm text-zinc-500">
             Zone : {formatMeters(size.width)} × {formatMeters(size.height)}
           </p>
+          <AnnouncementsPanel eventId={event.id} isPublished={event.is_published} initial={announcements} />
         </section>
 
         <section className="card flex flex-col gap-4 self-start">

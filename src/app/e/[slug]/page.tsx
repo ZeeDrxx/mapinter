@@ -7,6 +7,7 @@ import { getEventPlan } from "@/lib/layers";
 import { listPois } from "@/lib/pois";
 import { getVisibleEvent } from "@/lib/public-event";
 import { getAnchor } from "@/lib/anchors";
+import { listAnnouncements } from "@/lib/announcements";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -44,18 +45,17 @@ async function VisitorLoader({ params, searchParams }: Pick<PageProps<"/e/[slug]
   const [{ slug }, { lieu, ici }] = await Promise.all([params, searchParams]);
   const event = await getVisibleEvent(slug);
   if (!event) notFound();
-  const [{ image, drawn }, pois, here] = await Promise.all([
+  const [plan, pois, announcements, here] = await Promise.all([
     getEventPlan(event.id),
     listPois(event.id),
+    listAnnouncements(event.id, { liveOnly: true }),
     typeof ici === "string" ? getAnchor(event.id, ici) : null,
   ]);
 
   return (
     <VisitorMap
-      event={{ name: event.name, bbox: eventBBox(event), isPublished: event.is_published }}
-      image={image && { url: image.url, corners: image.corners, opacity: image.opacity }}
-      plan={drawn?.features ?? null}
-      pois={pois}
+      event={{ id: event.id, name: event.name, bbox: eventBBox(event), isPublished: event.is_published }}
+      initial={{ plan, pois, announcements }}
       initialPoiId={typeof lieu === "string" ? lieu : null}
       here={here}
     />

@@ -16,7 +16,9 @@ import {
   type PoiCategory,
 } from "@/lib/poi";
 import { setGuide, setHere } from "@/components/map/anchor-layers";
-import { fromLocal, type PlanCollection } from "@/lib/plan";
+import { emptyPlan, fromLocal } from "@/lib/plan";
+import { useLiveEvent, type LiveData } from "./use-live-event";
+import { AnnouncementBanner } from "./announcement-banner";
 import type { Anchor } from "@/lib/anchor";
 import {
   bearingDegrees,
@@ -109,21 +111,24 @@ function inside(b: BBox, [lng, lat]: LngLat, margin = 0) {
 
 export function VisitorMap({
   event,
-  image,
-  plan,
-  pois,
+  initial,
   initialPoiId = null,
   here = null,
 }: {
-  event: { name: string; bbox: BBox; isPublished: boolean };
-  image: PlanImage | null;
-  plan: PlanCollection | null;
-  pois: Poi[];
+  event: { id: string; name: string; bbox: BBox; isPublished: boolean };
+  /** Données rendues côté serveur, ensuite tenues à jour en direct. */
+  initial: LiveData;
   initialPoiId?: string | null;
   /** Ancre QR scannée pour ouvrir la carte. */
   here?: Anchor | null;
 }) {
   const { bbox } = event;
+  const { pois, plan: livePlan, announcements, live } = useLiveEvent(event.id, initial);
+  const image = useMemo<PlanImage | null>(
+    () => livePlan.image && { url: livePlan.image.url, corners: livePlan.image.corners, opacity: livePlan.image.opacity },
+    [livePlan.image],
+  );
+  const plan = livePlan.drawn?.features ?? null;
   const containerRef = useRef<HTMLDivElement>(null);
   const map = useMapLibre(containerRef, {
     bounds: [
@@ -179,7 +184,7 @@ export function VisitorMap({
   useEffect(() => {
     if (!map) return;
     setPlanImage(map, image);
-    if (plan) setPlanFeatures(map, plan);
+    setPlanFeatures(map, plan ?? emptyPlan());
   }, [map, image, plan]);
 
   useEffect(() => {
@@ -379,7 +384,16 @@ export function VisitorMap({
         )}
         <div className="pointer-events-auto relative mx-auto w-full max-w-md">
           <div className="rounded-2xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10">
-            <p className="truncate px-4 pt-2.5 text-xs font-semibold text-blue-600">{event.name}</p>
+            <div className="flex items-center gap-2 px-4 pt-2.5">
+              <p className="flex-1 truncate text-xs font-semibold text-blue-600">{event.name}</p>
+              <span
+                className={`flex items-center gap-1 text-[11px] font-medium ${live ? "text-green-600" : "text-zinc-400"}`}
+                title={live ? "Mises à jour en direct" : "Connexion au direct…"}
+              >
+                <span className={`size-1.5 rounded-full ${live ? "animate-pulse bg-green-500" : "bg-zinc-300"}`} />
+                {live ? "En direct" : "Hors ligne"}
+              </span>
+            </div>
             <input
               type="search"
               value={query}
@@ -427,6 +441,8 @@ export function VisitorMap({
             </p>
           )}
         </div>
+
+        <AnnouncementBanner announcements={announcements} />
 
         {here && (
           <p className="pointer-events-auto mx-auto flex max-w-md items-center gap-2 rounded-full bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white shadow">

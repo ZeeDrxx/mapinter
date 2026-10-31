@@ -63,4 +63,4 @@ La RLS garantit que seul le propriétaire modifie son event ; un event publié e
 3. ✅ Points d'intérêt (catégories, numéros, état, génération depuis les stands dessinés)
 4. ✅ Page visiteur publique `/e/[slug]` : recherche, filtres, fiche lieu, lien direct `?lieu=`, GPS, publication — reste : manifest PWA / hors-ligne
 5. ✅ QR codes « Vous êtes ici » : placement dans l'éditeur, affiches A4 imprimables, guidage distance/direction à vol d'oiseau
-6. Live : mises à jour en temps réel et annonces
+6. ✅ Live : mises à jour en temps réel (Supabase Realtime, filtré par la RLS) et annonces avec niveau et durée
