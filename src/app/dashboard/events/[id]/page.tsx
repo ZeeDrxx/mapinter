@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { eventBBox, formatEventDates, getMyEvent } from "@/lib/events";
 import { getEventPlan } from "@/lib/layers";
 import { listPois } from "@/lib/pois";
+import { listAnchors } from "@/lib/anchors";
 import { bboxSizeMeters, formatMeters } from "@/lib/geo";
 import { setPublished } from "./actions";
 
@@ -24,7 +25,11 @@ async function EventDetail({ params }: Pick<PageProps<"/dashboard/events/[id]">,
   const event = await getMyEvent(id);
   if (!event) notFound();
 
-  const [{ image, drawn }, pois] = await Promise.all([getEventPlan(event.id), listPois(event.id)]);
+  const [{ image, drawn }, pois, anchors] = await Promise.all([
+    getEventPlan(event.id),
+    listPois(event.id),
+    listAnchors(event.id),
+  ]);
   const bbox = eventBBox(event);
   const size = bboxSizeMeters(bbox);
   const drawnCount = drawn?.features.features.length ?? 0;
@@ -54,7 +59,23 @@ async function EventDetail({ params }: Pick<PageProps<"/dashboard/events/[id]">,
         </Link>
       ),
     },
-    { title: "QR codes « Vous êtes ici »", text: "Générez les QR codes à imprimer et coller sur place." },
+    {
+      title: "QR codes « Vous êtes ici »",
+      text: anchors.length
+        ? `${anchors.length} QR code(s) placé(s)`
+        : "Placez les QR codes sur le plan, puis imprimez les affiches à coller sur place.",
+      done: anchors.length > 0,
+      action: (
+        <div className="flex flex-wrap gap-2">
+          <Link href={`${editorHref}?tab=qr`} className="btn-secondary px-3 py-1.5">
+            {anchors.length ? "Gérer les QR codes" : "Placer les QR codes"}
+          </Link>
+          <Link href={`/dashboard/events/${event.id}/qr`} className="btn-ghost px-3 py-1.5">
+            Imprimer les affiches
+          </Link>
+        </div>
+      ),
+    },
     {
       title: "Publication",
       text: event.is_published

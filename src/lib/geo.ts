@@ -48,6 +48,27 @@ export function bboxSizeMeters(b: BBox): { width: number; height: number } {
   };
 }
 
+/** Cap de a vers b, en degrés (0 = nord, 90 = est). */
+export function bearingDegrees(a: LngLat, b: LngLat): number {
+  const φ1 = toRad(a[1]);
+  const φ2 = toRad(b[1]);
+  const Δλ = toRad(b[0] - a[0]);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+const CARDINALS = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ouest", "ouest", "nord-ouest"];
+
+export function cardinal(bearing: number): string {
+  return CARDINALS[Math.round(bearing / 45) % 8];
+}
+
+/** Temps de marche, à 1,2 m/s (allure de visite). */
+export function walkingMinutes(meters: number): number {
+  return Math.max(1, Math.round(meters / 1.2 / 60));
+}
+
 export function formatMeters(m: number): string {
   return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
 }

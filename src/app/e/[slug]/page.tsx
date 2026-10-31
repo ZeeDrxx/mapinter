@@ -6,6 +6,7 @@ import { eventBBox } from "@/lib/events";
 import { getEventPlan } from "@/lib/layers";
 import { listPois } from "@/lib/pois";
 import { getVisibleEvent } from "@/lib/public-event";
+import { getAnchor } from "@/lib/anchors";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -40,10 +41,14 @@ export default function VisitorPage({ params, searchParams }: PageProps<"/e/[slu
 }
 
 async function VisitorLoader({ params, searchParams }: Pick<PageProps<"/e/[slug]">, "params" | "searchParams">) {
-  const [{ slug }, { lieu }] = await Promise.all([params, searchParams]);
+  const [{ slug }, { lieu, ici }] = await Promise.all([params, searchParams]);
   const event = await getVisibleEvent(slug);
   if (!event) notFound();
-  const [{ image, drawn }, pois] = await Promise.all([getEventPlan(event.id), listPois(event.id)]);
+  const [{ image, drawn }, pois, here] = await Promise.all([
+    getEventPlan(event.id),
+    listPois(event.id),
+    typeof ici === "string" ? getAnchor(event.id, ici) : null,
+  ]);
 
   return (
     <VisitorMap
@@ -52,6 +57,7 @@ async function VisitorLoader({ params, searchParams }: Pick<PageProps<"/e/[slug]
       plan={drawn?.features ?? null}
       pois={pois}
       initialPoiId={typeof lieu === "string" ? lieu : null}
+      here={here}
     />
   );
 }

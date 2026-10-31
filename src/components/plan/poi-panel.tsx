@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
+import { useEffect, useEffectEvent, useState } from "react";
+import type { Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
 import type { BrowserSupabase } from "@/lib/supabase/client";
 import { poiAt } from "@/components/map/poi-layers";
 import { PLAN_FILL } from "@/components/map/plan-layers";
@@ -19,10 +19,10 @@ import {
 } from "@/lib/poi";
 import { ringCentroid, type PlanCollection } from "@/lib/plan";
 import type { LngLat } from "@/lib/geo";
+import { useAutosave } from "./use-autosave";
+import { useDragMarker } from "./use-drag-marker";
 
 type Patch = Partial<Omit<Poi, "id">>;
-
-const SAVE_DELAY_MS = 600;
 
 function toRow(patch: Patch) {
   const { featureId, ...rest } = patch;
@@ -55,53 +55,18 @@ export function PoiPanel({
   const [adding, setAdding] = useState(false);
   const [addCategory, setAddCategory] = useState<PoiCategory>("stand");
   const [query, setQuery] = useState("");
-  const [pending, setPending] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, track, queue, cancel } = useAutosave<Patch>((id, patch) =>
+    supabase.from("pois").update(toRow(patch)).eq("id", id),
+  );
 
   const selected = pois.find((p) => p.id === selectedId) ?? null;
 
   // --- Persistance ----------------------------------------------------------
 
-  const queued = useRef(new Map<string, Patch>());
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  async function track<T>(work: PromiseLike<{ error: unknown } & T>): Promise<T | null> {
-    setPending((n) => n + 1);
-    try {
-      const result = await work;
-      if (result.error) throw result.error;
-      setError(null);
-      return result;
-    } catch (e) {
-      console.error(e);
-      setError("Un enregistrement a échoué. Vérifiez votre connexion.");
-      return null;
-    } finally {
-      setPending((n) => n - 1);
-    }
-  }
-
-  function flush() {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    const batch = [...queued.current];
-    queued.current.clear();
-    for (const [id, patch] of batch) {
-      track(supabase.from("pois").update(toRow(patch)).eq("id", id));
-    }
-  }
-
   function update(id: string, patch: Patch, { immediate = false } = {}) {
     onChange((list) => list.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-    queued.current.set(id, { ...queued.current.get(id), ...patch });
-    if (timer.current) clearTimeout(timer.current);
-    if (immediate) flush();
-    else timer.current = setTimeout(flush, SAVE_DELAY_MS);
+    queue(id, patch, { immediate });
   }
-
-  // Envoie les modifications en attente en quittant l'onglet
-  const flushOnUnmount = useEffectEvent(() => flush());
-  useEffect(() => () => flushOnUnmount(), []);
 
   async function create(position: LngLat) {
     const result = await track(
@@ -118,7 +83,7 @@ export function PoiPanel({
   }
 
   async function remove(id: string) {
-    queued.current.delete(id);
+    cancel(id);
     const ok = await track(supabase.from("pois").delete().eq("id", id));
     if (!ok) return;
     onChange((list) => list.filter((p) => p.id !== id));
@@ -209,36 +174,12 @@ export function PoiPanel({
     };
   }, [map]);
 
-  // Marqueur déplaçable sur le lieu sélectionné
-  const marker = useRef<Marker | null>(null);
-  const selectedPosition = useEffectEvent((): LngLat | null => (selected ? [selected.lng, selected.lat] : null));
-  const onDragEnd = useEffectEvent((id: string, pos: LngLat) => update(id, { lng: pos[0], lat: pos[1] }, { immediate: true }));
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let cancelled = false;
-    import("maplibre-gl").then(({ Marker }) => {
-      const pos = selectedPosition();
-      if (cancelled || !pos) return;
-      const el = document.createElement("div");
-      el.className = "size-9 cursor-grab rounded-full border-[3px] border-blue-600 bg-blue-600/10";
-      el.title = "Glisser pour déplacer";
-      marker.current = new Marker({ element: el, draggable: true }).setLngLat(pos).addTo(map);
-      marker.current.on("dragend", () => {
-        const p = marker.current!.getLngLat();
-        onDragEnd(selectedId, [p.lng, p.lat]);
-      });
-    });
-    return () => {
-      cancelled = true;
-      marker.current?.remove();
-      marker.current = null;
-    };
-  }, [map, selectedId]);
-
-  useEffect(() => {
-    if (selected) marker.current?.setLngLat([selected.lng, selected.lat]);
-  }, [selected]);
+  useDragMarker(
+    map,
+    selected,
+    (id, [lng, lat]) => update(id, { lng, lat }, { immediate: true }),
+    "size-9 cursor-grab rounded-full border-[3px] border-blue-600 bg-blue-600/10",
+  );
 
   function focus(poi: Poi) {
     onSelect(poi.id);

@@ -16,11 +16,13 @@ import type { Json } from "@/lib/database.types";
 import { ImagePanel } from "./image-panel";
 import { DrawPanel } from "./draw-panel";
 import { PoiPanel } from "./poi-panel";
+import { AnchorPanel } from "./anchor-panel";
+import type { Anchor } from "@/lib/anchor";
 
 /** Calque image en cours d'édition ; `aspect` = hauteur / largeur en pixels, connu après chargement. */
 export type EditorImage = ImageLayer & { aspect: number | null };
 
-export type EditorTab = "image" | "draw" | "pois";
+export type EditorTab = "image" | "draw" | "pois" | "qr";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const HISTORY_LIMIT = 100;
@@ -29,6 +31,7 @@ const TABS: [EditorTab, string][] = [
   ["image", "Image"],
   ["draw", "Dessin"],
   ["pois", "Lieux"],
+  ["qr", "QR codes"],
 ];
 
 export function PlanEditor({
@@ -36,12 +39,14 @@ export function PlanEditor({
   initialImage,
   initialDrawn,
   initialPois,
+  initialAnchors,
   initialTab,
 }: {
   event: { id: string; name: string; slug: string; bbox: BBox };
   initialImage: ImageLayer | null;
   initialDrawn: DrawnLayer | null;
   initialPois: Poi[];
+  initialAnchors: Anchor[];
   initialTab?: EditorTab;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -57,6 +62,7 @@ export function PlanEditor({
   const [tab, setTab] = useState<EditorTab>(initialTab ?? (initialDrawn && !initialImage ? "draw" : "image"));
   const [pois, setPois] = useState<Poi[]>(initialPois);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+  const [anchors, setAnchors] = useState<Anchor[]>(initialAnchors);
   const [image, setImage] = useState<EditorImage | null>(
     initialImage ? { ...initialImage, aspect: null } : null,
   );
@@ -185,7 +191,7 @@ export function PlanEditor({
               Vue visiteur ↗
             </a>
           </div>
-          <div className="mt-3 grid grid-cols-3 rounded-lg bg-zinc-100 p-1 text-sm dark:bg-zinc-800">
+          <div className="mt-3 grid grid-cols-4 rounded-lg bg-zinc-100 p-1 text-sm dark:bg-zinc-800">
             {TABS.map(([value, label]) => (
               <button
                 key={value}
@@ -215,6 +221,14 @@ export function PlanEditor({
                 bbox={event.bbox}
                 image={image}
                 onChange={changeImage}
+              />
+            ) : tab === "qr" ? (
+              <AnchorPanel
+                map={map}
+                supabase={supabase}
+                eventId={event.id}
+                anchors={anchors}
+                onChange={setAnchors}
               />
             ) : tab === "pois" ? (
               <PoiPanel

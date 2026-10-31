@@ -5,10 +5,11 @@ import { PlanEditor, type EditorTab } from "@/components/plan/plan-editor";
 import { eventBBox, getMyEvent } from "@/lib/events";
 import { getEventPlan } from "@/lib/layers";
 import { listPois } from "@/lib/pois";
+import { listAnchors } from "@/lib/anchors";
 
 export const metadata: Metadata = { title: "Carte de l'event" };
 
-const TAB_PARAMS: Record<string, EditorTab> = { image: "image", dessin: "draw", lieux: "pois" };
+const TAB_PARAMS: Record<string, EditorTab> = { image: "image", dessin: "draw", lieux: "pois", qr: "qr" };
 
 export default function PlanPage({ params, searchParams }: PageProps<"/dashboard/events/[id]/plan">) {
   return (
@@ -29,7 +30,11 @@ async function PlanLoader({
   const [{ id }, { tab }] = await Promise.all([params, searchParams]);
   const event = await getMyEvent(id);
   if (!event) notFound();
-  const [{ image, drawn }, pois] = await Promise.all([getEventPlan(event.id), listPois(event.id)]);
+  const [{ image, drawn }, pois, anchors] = await Promise.all([
+    getEventPlan(event.id),
+    listPois(event.id),
+    listAnchors(event.id),
+  ]);
 
   return (
     <PlanEditor
@@ -37,6 +42,7 @@ async function PlanLoader({
       initialImage={image}
       initialDrawn={drawn}
       initialPois={pois}
+      initialAnchors={anchors}
       initialTab={typeof tab === "string" ? TAB_PARAMS[tab] : undefined}
     />
   );

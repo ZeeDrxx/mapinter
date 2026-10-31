@@ -6,7 +6,7 @@ import { signOut } from "@/app/login/actions";
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <header className="border-b border-zinc-200 bg-white print:hidden dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-6">
           <Link href="/dashboard" className="font-semibold">
             <span className="text-blue-600">Map</span>Inter

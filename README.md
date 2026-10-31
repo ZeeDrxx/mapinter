@@ -23,6 +23,8 @@ Créer `.env.local` :
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY affichée par supabase status>
+# En production : URL publique encodée dans les QR codes imprimés
+# NEXT_PUBLIC_SITE_URL=https://votre-domaine.fr
 ```
 
 Puis :
@@ -60,5 +62,5 @@ La RLS garantit que seul le propriétaire modifie son event ; un event publié e
 2. ✅ Calque : upload + calage (rigide ou coins libres), ou éditeur (rectangles, polygones, chemins, grilles de stands, import des bâtiments OSM via Overpass)
 3. ✅ Points d'intérêt (catégories, numéros, état, génération depuis les stands dessinés)
 4. ✅ Page visiteur publique `/e/[slug]` : recherche, filtres, fiche lieu, lien direct `?lieu=`, GPS, publication — reste : manifest PWA / hors-ligne
-5. QR codes « Vous êtes ici » + GPS quand il est précis
+5. ✅ QR codes « Vous êtes ici » : placement dans l'éditeur, affiches A4 imprimables, guidage distance/direction à vol d'oiseau
 6. Live : mises à jour en temps réel et annonces

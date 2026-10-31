@@ -25,6 +25,25 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    print-color-adjust: exact;
+  }
+  .qr-sheet {
+    break-after: page;
+    break-inside: avoid;
+  }
+  .qr-sheet:last-child {
+    break-after: auto;
+  }
+}
+
 @layer components {
   .btn-primary,
   .btn-secondary,

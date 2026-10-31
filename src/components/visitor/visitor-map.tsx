@@ -15,12 +15,24 @@ import {
   type Poi,
   type PoiCategory,
 } from "@/lib/poi";
+import { setGuide, setHere } from "@/components/map/anchor-layers";
 import { fromLocal, type PlanCollection } from "@/lib/plan";
-import type { BBox, LngLat } from "@/lib/geo";
+import type { Anchor } from "@/lib/anchor";
+import {
+  bearingDegrees,
+  cardinal,
+  distanceMeters,
+  formatMeters,
+  walkingMinutes,
+  type BBox,
+  type LngLat,
+} from "@/lib/geo";
 
 const POI_PARAM = "lieu";
 /** Au-delà, la position GPS est signalée comme approximative. */
 const GOOD_ACCURACY_M = 30;
+/** En deçà, le GPS est préféré au dernier QR scanné (qui vieillit dès qu'on marche). */
+const PRECISE_GPS_M = 15;
 /** Hauteur réservée à la fiche du lieu, pour centrer la carte au-dessus. */
 const SHEET_PADDING = 240;
 
@@ -75,6 +87,18 @@ function setMe(map: MapLibreMap, geo: Geo | null) {
   });
 }
 
+/** Distance, direction et temps de marche à vol d'oiseau (en attendant le calcul d'itinéraire). */
+function describeRoute(from: LngLat, to: LngLat) {
+  const meters = distanceMeters(from, to);
+  const bearing = bearingDegrees(from, to);
+  return { meters, bearing, direction: cardinal(bearing), minutes: walkingMinutes(meters) };
+}
+
+/** « vers le nord », « vers l'est » */
+function towards(direction: string) {
+  return /^[eo]/.test(direction) ? `vers l'${direction}` : `vers le ${direction}`;
+}
+
 function inside(b: BBox, [lng, lat]: LngLat, margin = 0) {
   const dx = (b[2] - b[0]) * margin;
   const dy = (b[3] - b[1]) * margin;
@@ -89,12 +113,15 @@ export function VisitorMap({
   plan,
   pois,
   initialPoiId = null,
+  here = null,
 }: {
   event: { name: string; bbox: BBox; isPublished: boolean };
   image: PlanImage | null;
   plan: PlanCollection | null;
   pois: Poi[];
   initialPoiId?: string | null;
+  /** Ancre QR scannée pour ouvrir la carte. */
+  here?: Anchor | null;
 }) {
   const { bbox } = event;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +152,17 @@ export function VisitorMap({
   const categories = POI_CATEGORY_IDS.filter((c) => pois.some((p) => p.category === c));
   const results = searchOpen ? searchPois(pois, query) : [];
 
+  // Point de départ du guidage : GPS s'il est très précis, sinon le dernier QR scanné, sinon un GPS correct
+  const origin: LngLat | null =
+    geo && geo.accuracy <= PRECISE_GPS_M
+      ? geo.position
+      : here
+        ? [here.lng, here.lat]
+        : geo && geo.accuracy <= GOOD_ACCURACY_M
+          ? geo.position
+          : null;
+  const guidance = origin && selected ? describeRoute(origin, [selected.lng, selected.lat]) : null;
+
   // --- Carte ------------------------------------------------------------------
 
   // On empêche de s'éloigner du site (zone + sa taille de chaque côté)
@@ -152,29 +190,60 @@ export function VisitorMap({
     if (map) setMe(map, geo);
   }, [map, geo]);
 
+  useEffect(() => {
+    if (map) setHere(map, here);
+  }, [map, here]);
+
+  const originLng = origin?.[0];
+  const originLat = origin?.[1];
+  useEffect(() => {
+    if (!map) return;
+    const from: LngLat | null = originLng !== undefined && originLat !== undefined ? [originLng, originLat] : null;
+    setGuide(map, from, selected ? [selected.lng, selected.lat] : null);
+  }, [map, originLng, originLat, selected]);
+
+  // Carte toujours orientée nord : la flèche de direction reste juste
+  useEffect(() => {
+    if (!map) return;
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+  }, [map]);
+
   function select(poi: Poi | null, { fly = true } = {}) {
     setSelectedId(poi?.id ?? null);
     const url = new URL(window.location.href);
     if (poi) url.searchParams.set(POI_PARAM, poi.id);
     else url.searchParams.delete(POI_PARAM);
     window.history.replaceState(null, "", url);
-    if (poi && fly && map) {
-      map.easeTo({
-        center: [poi.lng, poi.lat],
-        zoom: Math.max(map.getZoom(), 18),
-        padding: { top: 0, bottom: SHEET_PADDING, left: 0, right: 0 },
-      });
+    if (!poi || !fly || !map) return;
+    const padding = { top: 140, bottom: SHEET_PADDING + 24, left: 40, right: 40 };
+    if (origin) {
+      // Cadre le trajet entier : position du visiteur → lieu
+      map.fitBounds(
+        [
+          [Math.min(origin[0], poi.lng), Math.min(origin[1], poi.lat)],
+          [Math.max(origin[0], poi.lng), Math.max(origin[1], poi.lat)],
+        ],
+        { padding, maxZoom: 19 },
+      );
+    } else {
+      map.easeTo({ center: [poi.lng, poi.lat], zoom: Math.max(map.getZoom(), 18), padding: { ...padding, top: 0 } });
     }
   }
 
-  // Lien partagé (/e/slug?lieu=<id>) : centre la carte sur le lieu à l'ouverture
+  // Ouverture par un lien : sur le lieu partagé (?lieu=) ou sur le QR scanné (?ici=)
   const centerOnInitial = useEffectEvent(() => {
-    if (!map || !selected) return;
-    map.jumpTo({
-      center: [selected.lng, selected.lat],
-      zoom: 18,
-      padding: { top: 0, bottom: SHEET_PADDING, left: 0, right: 0 },
-    });
+    if (!map) return;
+    if (selected) {
+      map.jumpTo({
+        center: [selected.lng, selected.lat],
+        zoom: 18,
+        padding: { top: 0, bottom: SHEET_PADDING, left: 0, right: 0 },
+      });
+    } else if (here) {
+      map.jumpTo({ center: [here.lng, here.lat], zoom: 18 });
+    }
   });
   useEffect(() => {
     if (map) centerOnInitial();
@@ -359,6 +428,13 @@ export function VisitorMap({
           )}
         </div>
 
+        {here && (
+          <p className="pointer-events-auto mx-auto flex max-w-md items-center gap-2 rounded-full bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white shadow">
+            <span className="size-2.5 rounded-full bg-white" />
+            Vous êtes ici : {here.label}
+          </p>
+        )}
+
         {categories.length > 1 && (
           <div className="pointer-events-auto mx-auto flex w-full max-w-md gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
             {categories.map((c) => {
@@ -449,6 +525,30 @@ export function VisitorMap({
               ✕
             </button>
           </div>
+          {guidance && (
+            <div className="mt-3 flex items-center gap-3 rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                className="shrink-0 text-rose-600"
+                style={{ transform: `rotate(${guidance.bearing}deg)` }}
+                aria-hidden
+              >
+                <path d="M12 2 L19 20 L12 16 L5 20 Z" fill="currentColor" />
+              </svg>
+              <p>
+                <strong>{guidance.meters < 5 ? "Vous y êtes" : formatMeters(guidance.meters)}</strong>
+                {guidance.meters >= 5 && (
+                  <>
+                    {" "}
+                    {towards(guidance.direction)} · ~{guidance.minutes} min à pied
+                    <span className="block text-xs text-rose-700/80 dark:text-rose-200/70">à vol d&apos;oiseau</span>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
           {selected.description && (
             <p className="mt-3 text-sm whitespace-pre-line text-zinc-600 dark:text-zinc-300">{selected.description}</p>
           )}
