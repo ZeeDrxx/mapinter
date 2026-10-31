@@ -10,7 +10,7 @@ import { setGuide, setHere } from "@/components/map/anchor-layers";
 import { Pictogram } from "@/components/ui/pictogram";
 import { StatusMark } from "@/components/ui/status";
 import { POI_CATEGORIES, POI_CATEGORY_IDS, poiTitle, searchPois, type Poi, type PoiCategory } from "@/lib/poi";
-import { emptyPlan, fromLocal } from "@/lib/plan";
+import { emptyPlan, fromLocal, type PlanCollection } from "@/lib/plan";
 import { mapPalette } from "@/lib/theme";
 import type { Anchor } from "@/lib/anchor";
 import {
@@ -90,6 +90,20 @@ function describeRoute(from: LngLat, to: LngLat) {
   const meters = distanceMeters(from, to);
   const bearing = bearingDegrees(from, to);
   return { meters, bearing, direction: cardinal(bearing), minutes: walkingMinutes(meters) };
+}
+
+/** Emprise des éléments dessinés, ou null si le plan est vide. */
+function planExtent(plan: PlanCollection): BBox | null {
+  const points = plan.features.flatMap((f) =>
+    f.geometry.type === "Polygon" ? (f.geometry.coordinates[0] as LngLat[]) : (f.geometry.coordinates as LngLat[]),
+  );
+  if (!points.length) return null;
+  return [
+    Math.min(...points.map((p) => p[0])),
+    Math.min(...points.map((p) => p[1])),
+    Math.max(...points.map((p) => p[0])),
+    Math.max(...points.map((p) => p[1])),
+  ];
 }
 
 /** « vers le nord », « vers l'est » */
@@ -259,12 +273,14 @@ export function VisitorMap({
     } else if (here) {
       map.jumpTo({ center: [here.lng, here.lat], zoom: 18 });
     } else {
+      // Le plan dessiné plutôt que la zone (qui garde des marges) : le hall remplit l'écran
+      const [w, s, e, n] = (plan && planExtent(plan)) ?? bbox;
       map.fitBounds(
         [
-          [bbox[0], bbox[1]],
-          [bbox[2], bbox[3]],
+          [w, s],
+          [e, n],
         ],
-        { padding: 24, animate: false },
+        { padding: 16, animate: false },
       );
     }
   });
