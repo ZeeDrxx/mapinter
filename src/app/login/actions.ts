@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/site-url";
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -33,7 +34,11 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     return { error: "Le mot de passe doit contenir au moins 8 caractères." };
   }
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${await getSiteUrl()}/auth/callback` },
+  });
   if (error) {
     return {
       error:
@@ -43,7 +48,9 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     };
   }
   if (!data.session) {
-    return { message: "Compte créé : confirmez votre adresse via l'e-mail reçu." };
+    return {
+      message: "Compte créé : ouvrez le lien reçu par e-mail dans ce navigateur pour confirmer votre adresse.",
+    };
   }
   redirect("/dashboard");
 }

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { getMyEvent } from "@/lib/events";
-import { getSiteUrl, listAnchors } from "@/lib/anchors";
+import { listAnchors } from "@/lib/anchors";
+import { getSiteUrl } from "@/lib/site-url";
 import { anchorUrl } from "@/lib/anchor";
 import { PrintButton } from "./print-button";
 

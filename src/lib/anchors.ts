@@ -1,5 +1,4 @@
 import "server-only";
-import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { ANCHOR_COLUMNS, type Anchor } from "@/lib/anchor";
 
@@ -28,16 +27,4 @@ export async function getAnchor(eventId: string, anchorId: string): Promise<Anch
     throw error;
   }
   return data;
-}
-
-/**
- * URL publique du site, encodée dans les QR codes.
- * NEXT_PUBLIC_SITE_URL en production ; à défaut, l'hôte de la requête.
- */
-export async function getSiteUrl(): Promise<string> {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
 }
