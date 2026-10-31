@@ -37,6 +37,23 @@ npm run dev
 - Supabase Studio : http://127.0.0.1:54323
 - E-mails de test (Mailpit) : http://127.0.0.1:54324
 
+## Production
+
+- App : https://mapinter.vercel.app (Vercel, déployée automatiquement à chaque push sur `mvp`)
+- Base : projet Supabase `mapinter` (`xngqrjmplzlyqzftejkm`, région Paris)
+- Variables Vercel : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL`
+
+Mettre à jour la base en ligne :
+
+```bash
+npx supabase db push --linked                                  # nouvelles migrations
+npx supabase config push --project-ref xngqrjmplzlyqzftejkm   # réglages auth ([remotes.production] dans config.toml)
+```
+
+`config push` affiche un diff et demande confirmation service par service : relire avant de valider.
+
+**À faire avant d'ouvrir aux organisateurs** : brancher un SMTP (Resend, Brevo…) dans Supabase → Authentication → SMTP. Le serveur d'e-mails par défaut n'envoie qu'aux membres de l'équipe Supabase et quelques messages par heure.
+
 ## Base de données
 
 Les migrations sont dans [supabase/migrations](supabase/migrations). Après modification du schéma :
